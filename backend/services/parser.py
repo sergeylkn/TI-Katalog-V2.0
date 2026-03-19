@@ -1,82 +1,93 @@
-import asyncio, logging, re
-from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any, Tuple
-import fitz  # PyMuPDF
+"""Parser orchestrator — download → parse → store."""
+
+import logging
+from datetime import datetime, timezone
+
+from core.database import AsyncSessionLocal
+from models.models import Document, Product, ProductImage, TextChunk, ParseLog
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class ExtractedProduct:
-    title: str
-    sku: Optional[str]
-    description: str  # Здесь хранится всё техническое описание для ИI
-    page: int
-    bbox: Dict[str, float]
-    raw_text: str     # Необработанный текст для глубокого анализа ИИ
-    image_rects: List[Dict[str, float]] = field(default_factory=list)
 
-async def parse_document(pdf_bytes: bytes) -> List[ExtractedProduct]:
-    """Основная функция для импортера: извлекает товары с тех. описанием"""
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    all_products = []
+def _now():
+    return datetime.now(timezone.utc)
 
-    for page_num in range(len(doc)):
-        page = doc[page_num]
-        curr_page_num = page_num + 1
-        
-        # 1. Получаем все блоки текста на странице
-        blocks = page.get_text("blocks", sort=True)
-        
-        # 2. Получаем координаты всех изображений на странице
-        img_info = page.get_images(full=True)
-        page_img_rects = []
-        for img in img_info:
-            for r in page.get_image_rects(img[0]):
-                page_img_rects.append({"x0": r.x0, "y0": r.y0, "x1": r.x1, "y1": r.y1})
 
-        # 3. Группируем текст в логические блоки (товары)
-        # Мы объединяем блоки, если расстояние между ними меньше 50 пунктов
-        temp_products = []
-        for b in blocks:
-            x0, y0, x1, y1, text, block_no, block_type = b
-            if block_type != 0 or not text.strip(): continue # Пропускаем не текст
-            
-            clean_text = text.replace('\n', ' ').strip()
-            if len(clean_text) < 3: continue
+async def _log(db, doc_id, level: str, msg: str):
+    db.add(ParseLog(document_id=doc_id, level=level, message=msg[:800]))
 
-            # Если новый блок близко к предыдущему — объединяем
-            if temp_products and y0 - temp_products[-1]['y1'] < 50:
-                temp_products[-1]['text'] += " " + clean_text
-                temp_products[-1]['y1'] = max(temp_products[-1]['y1'], y1)
-                temp_products[-1]['x1'] = max(temp_products[-1]['x1'], x1)
-                temp_products[-1]['x0'] = min(temp_products[-1]['x0'], x0)
-            else:
-                temp_products.append({
-                    'text': clean_text, 
-                    'x0': x0, 'y0': y0, 'x1': x1, 'y1': y1
-                })
 
-        # 4. Превращаем группы в объекты ExtractedProduct
-        for tp in temp_products:
-            # Ищем SKU (артикул) внутри собранного текста
-            sku_match = re.search(r'\b([A-Z0-9]{5,20})\b', tp['text'])
-            sku = sku_match.group(1) if sku_match else None
-            
-            # Привязываем картинки, которые находятся в зоне этого текста
-            rel_imgs = [
-                img for img in page_img_rects 
-                if abs(img['y0'] - tp['y0']) < 100 # Картинка рядом с текстом
-            ]
+async def parse_document(document_id: int):
+    from parsers.pdf_parser import download_pdf, parse_pdf_bytes, detect_products
+    async with AsyncSessionLocal() as db:
+        doc = await db.get(Document, document_id)
+        if not doc or doc.status == "parsing":
+            return
+        doc.status = "parsing"
+        await db.commit()
 
-            all_products.append(ExtractedProduct(
-                title=tp['text'].split('.')[0][:255], # Первое предложение как заголовок
-                sku=sku,
-                description=tp['text'], # Полный текст для поиска ИИ
-                raw_text=tp['text'].lower(),
-                page=curr_page_num,
-                bbox={"x0": tp['x0'], "y0": tp['y0'], "x1": tp['x1'], "y1": tp['y1']},
-                image_rects=rel_imgs
-            ))
+        try:
+            await _log(db, doc.id, "info", f"Завантаження: {doc.file_url}")
+            await db.commit()
 
-    doc.close()
-    return all_products
+            import httpx
+            async with httpx.AsyncClient(timeout=120, follow_redirects=True) as c:
+                resp = await c.get(doc.file_url)
+                resp.raise_for_status()
+            pdf_bytes = resp.content
+
+            await _log(db, doc.id, "info", f"Завантажено {len(pdf_bytes):,} байт")
+            await db.commit()
+
+            text_blocks, image_blocks, page_count = parse_pdf_bytes(pdf_bytes)
+            doc.page_count = page_count
+            await _log(db, doc.id, "info",
+                       f"Сторінок: {page_count} · Блоків: {len(text_blocks)} · Зображень: {len(image_blocks)}")
+            await db.commit()
+
+            for b in text_blocks:
+                db.add(TextChunk(
+                    document_id=doc.id, text=b.text, page_number=b.page,
+                    bbox={"x0": b.x0, "y0": b.y0, "x1": b.x1, "y1": b.y1},
+                    block_type=b.block_type,
+                ))
+            await db.flush()
+
+            products = detect_products(text_blocks, image_blocks)
+            await _log(db, doc.id, "info", f"Виявлено {len(products)} товарів")
+
+            for p in products:
+                try:
+                    prod = Product(
+                        document_id=doc.id, section_id=doc.section_id,
+                        title=p.title, sku=p.sku, description=p.description,
+                        attributes=p.attributes or {}, page_number=p.page, bbox=p.bbox,
+                    )
+                    db.add(prod)
+                    await db.flush()
+                    for idx, img in enumerate(p.images):
+                        db.add(ProductImage(
+                            product_id=prod.id, image_data=img.data_b64,
+                            page_number=img.page,
+                            bbox={"x0": img.x0, "y0": img.y0, "x1": img.x1, "y1": img.y1},
+                            width=img.width, height=img.height, is_primary=(idx == 0),
+                        ))
+                except Exception as e:
+                    logger.warning(f"Product save error: {e}")
+
+            doc.status = "done"
+            doc.parsed_at = _now()
+            await db.commit()
+            await _log(db, doc.id, "info", "✅ Парсинг завершено")
+            await db.commit()
+            logger.info(f"✅ {doc.name}: {len(products)} products")
+
+        except Exception as e:
+            logger.error(f"Parse error {document_id}: {e}")
+            try:
+                doc.status = "error"
+                doc.error_msg = str(e)[:400]
+                await _log(db, doc.id, "error", f"Помилка: {e}")
+                await db.commit()
+            except Exception:
+                pass
