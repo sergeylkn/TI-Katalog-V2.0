@@ -1,5 +1,7 @@
-"""AI Chat + Recommendations."""
+"""AI Chat API."""
 
+import os
+import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -8,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from models.models import Product
-from services.claude import chat_response, recommendations as ai_recs
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -20,43 +22,40 @@ class Msg(BaseModel):
 
 class ChatIn(BaseModel):
     messages: List[Msg]
-    section_id: str | None = None
 
 
-@router.post("/message")
-async def message(body: ChatIn, db: AsyncSession = Depends(get_db)):
-    if not body.messages:
-        raise HTTPException(400, "Повідомлення порожнє")
-    products = (await db.scalars(select(Product).limit(30))).all()
-    context = "\n".join(f"- {p.title} (SKU: {p.sku or 'N/A'})" for p in products[:20])
-    msgs = [{"role": m.role, "content": m.content} for m in body.messages]
+@router.post("")
+@router.post("/")
+async def chat(body: ChatIn, db: AsyncSession = Depends(get_db)):
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {"reply": "⚠️ ANTHROPIC_API_KEY не налаштовано. Перейдіть в адмін-панель."}
+
+    # Get light catalog context
+    r = await db.execute(select(Product).limit(25))
+    products = r.scalars().all()
+    ctx = "\n".join(f"- {p.title} (SKU: {p.sku or 'N/A'})" for p in products[:20])
+
+    import httpx, json
+    system = (
+        "Ти — інтелектуальний помічник техпідтримки TI-Katalog. "
+        "Спеціалізація: промислове обладнання (шланги, фітинги, насоси, манометри, ущільнення, арматура). "
+        "Відповідай ТІЛЬКИ УКРАЇНСЬКОЮ мовою. Будь точним у технічних параметрах (DN, PN, матеріал).\n"
+        f"{'Доступні товари:\n' + ctx if ctx else ''}"
+    )
+    messages = [{"role": m.role, "content": m.content} for m in body.messages]
+
     try:
-        reply = await chat_response(msgs, context, db)
-    except RuntimeError as e:
-        raise HTTPException(503, str(e))
-    return {"reply": reply}
-
-
-@router.get("/recommendations/{prod_id}")
-async def recommend(prod_id: str, db: AsyncSession = Depends(get_db)):
-    import uuid
-    p = await db.get(Product, uuid.UUID(prod_id))
-    if not p:
-        raise HTTPException(404, "Товар не знайдено")
-    all_p = (await db.scalars(select(Product).limit(80))).all()
-    pool = [{"id": str(x.id), "title": x.title, "sku": x.sku}
-            for x in all_p if str(x.id) != prod_id]
-    product_dict = {"id": str(p.id), "title": p.title, "sku": p.sku,
-                    "attributes": p.attributes or {}}
-    try:
-        recs = await ai_recs(product_dict, pool, db)
-    except Exception:
-        recs = []
-    by_id = {str(x.id): x for x in all_p}
-    result = []
-    for r in recs[:5]:
-        pid = r.get("id")
-        if pid and pid in by_id:
-            x = by_id[pid]
-            result.append({"id": str(x.id), "title": x.title, "sku": x.sku, "reason": r.get("reason", "")})
-    return {"recommendations": result}
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(
+                "https://api.anthropic.com/v1/messages",
+                json={"model": "claude-opus-4-5", "max_tokens": 1024,
+                      "system": system, "messages": messages},
+                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                         "content-type": "application/json"},
+            )
+            r.raise_for_status()
+        return {"reply": r.json()["content"][0]["text"]}
+    except Exception as e:
+        logger.error(f"Chat error: {e}")
+        return {"reply": f"Помилка AI: {str(e)[:200]}"}

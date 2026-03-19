@@ -1,6 +1,5 @@
 """
-ORM Models — Integer PKs, asyncpg-compatible, DeclarativeBase.
-Base is defined HERE — do NOT import it from core.database.
+ORM Models — Integer PKs, asyncpg-compatible, DeclarativeBase with __allow_unmapped__.
 """
 
 from datetime import datetime, timezone

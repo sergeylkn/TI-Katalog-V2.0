@@ -1,21 +1,20 @@
-"""Async-safe in-memory LRU cache. TTL=5min, max=256."""
+"""Async LRU cache. TTL=5min, max=256 entries."""
 
 import asyncio, hashlib, time
 from collections import OrderedDict
 from typing import Any, Optional
 
-_lock   = asyncio.Lock()
+_lock  = asyncio.Lock()
 _store: OrderedDict = OrderedDict()
-_MAX    = 256
-_TTL    = 300
+_MAX, _TTL = 256, 300
 
 
-def _key(q: str, sec: Optional[str]) -> str:
-    return hashlib.md5(f"{q.strip().lower()}|{sec or ''}".encode()).hexdigest()
+def _k(q: str, sid: Optional[str]) -> str:
+    return hashlib.md5(f"{q.lower()}|{sid or ''}".encode()).hexdigest()
 
 
-async def cache_get(q: str, sec: Optional[str] = None) -> Optional[Any]:
-    k = _key(q, sec)
+async def cache_get(q: str, sid: Optional[str] = None) -> Optional[Any]:
+    k = _k(q, sid)
     async with _lock:
         if k not in _store:
             return None
@@ -26,8 +25,8 @@ async def cache_get(q: str, sec: Optional[str] = None) -> Optional[Any]:
         return val
 
 
-async def cache_set(q: str, val: Any, sec: Optional[str] = None):
-    k = _key(q, sec)
+async def cache_set(q: str, val: Any, sid: Optional[str] = None):
+    k = _k(q, sid)
     async with _lock:
         _store[k] = (time.time(), val)
         _store.move_to_end(k)

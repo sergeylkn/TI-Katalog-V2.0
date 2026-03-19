@@ -1,17 +1,28 @@
-"""Products API — Integer IDs, correct async SQLAlchemy pattern."""
+"""Products API — Integer IDs, accepts both int and slug for section."""
 
 import logging
-from typing import Optional
+from typing import Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from core.database import get_db
-from models.models import Product, ProductImage
+from models.models import Product, ProductImage, Document, Section
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _resolve_section_id(section_ref: str, db: AsyncSession) -> Optional[int]:
+    """Accept integer ID or slug string."""
+    try:
+        return int(section_ref)
+    except ValueError:
+        # It's a slug — look it up
+        r = await db.execute(select(Section).where(Section.slug == section_ref))
+        sec = r.scalar_one_or_none()
+        return sec.id if sec else None
 
 
 @router.get("/")
@@ -46,15 +57,18 @@ async def list_products(
             "items": [_prod(p) for p in rows]}
 
 
-@router.get("/section/{section_id}")
+@router.get("/section/{section_ref}")
 async def products_by_section(
-    section_id: int,
+    section_ref: str,           # accepts "42" (int) or "shlangy" (slug)
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
+    sid = await _resolve_section_id(section_ref, db)
+    if sid is None:
+        raise HTTPException(404, f"Розділ '{section_ref}' не знайдено")
     q = select(Product).options(selectinload(Product.images)).where(
-        Product.section_id == section_id
+        Product.section_id == sid
     )
     total_r = await db.execute(select(func.count()).select_from(q.subquery()))
     total = total_r.scalar_one() or 0
@@ -73,8 +87,9 @@ async def recommendations(prod_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(404, "Товар не знайдено")
     r = await db.execute(
         select(Product)
+        .options(selectinload(Product.images))
         .where(Product.section_id == p.section_id, Product.id != prod_id)
-        .limit(5)
+        .limit(6)
     )
     recs = r.scalars().all()
     return {"recommendations": [
@@ -92,7 +107,17 @@ async def get_product(prod_id: int, db: AsyncSession = Depends(get_db)):
     p = r.scalar_one_or_none()
     if not p:
         raise HTTPException(404, "Товар не знайдено")
-    return _prod(p, detail=True)
+
+    # Fetch document for deep PDF link
+    doc = await db.get(Document, p.document_id)
+    doc_url = None
+    if doc:
+        base = doc.file_url or ""
+        doc_url = f"{base}#page={p.page_number}" if p.page_number else base
+
+    result = _prod(p, detail=True)
+    result["document_url"] = doc_url
+    return result
 
 
 def _prod(p: Product, detail=False):

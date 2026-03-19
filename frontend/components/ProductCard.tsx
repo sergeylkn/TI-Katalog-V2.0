@@ -1,100 +1,103 @@
-'use client';
+'use client'
+import Link from 'next/link'
+import { Package, Tag, FileText } from 'lucide-react'
+import type { Product } from '@/lib/api'
 
-import React from 'react';
-import { Document, Page } from 'react-pdf';
-import { pdfjs } from 'react-pdf';
-import { ExternalLink, FileText, Target, Sparkles } from 'lucide-react';
-import Link from 'next/link';
-
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-
-interface Product {
-  id: string;
-  title: string;
-  sku: string | null;
-  description: string | null;
-  page_number: number;
-  document_url: string;
-  document_id?: string;
-  relevance?: number; // Добавлено для поиска
-  reason?: string;    // Добавлено для поиска
+// Technical attribute icon mapping
+const ATTR_ICONS: Record<string, string> = {
+  'Тиск': '⚡', 'Діаметр': '⭕', 'Матеріал': '🔩',
+  'Різьба': '🔧', 'Температура': '🌡️', 'Довжина': '📏',
+  'Стандарт': '📋',
 }
 
-interface ProductCardProps {
-  product: Product;
-  relevance?: number; // Разрешаем пропс relevance
-  reason?: string;    // Разрешаем пропс reason
-}
-
-export const ProductCard: React.FC<ProductCardProps> = ({ product, relevance, reason }) => {
-  // Используем либо пропсы напрямую, либо поля из объекта продукта
-  const rel = relevance ?? product.relevance;
-  const res = reason ?? product.reason;
+export function ProductCard({ product, relevance, reason }: {
+  product: Product; relevance?: number; reason?: string
+}) {
+  const attrs = product.attributes || {}
+  const attrEntries = Object.entries(attrs).slice(0, 4)
 
   return (
-    <div className="group bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col h-full relative">
-      {/* Индикатор релевантности (если есть) */}
-      {rel !== undefined && (
-        <div className="absolute top-2 left-2 z-10 flex items-center gap-1 px-2 py-1 bg-white/90 backdrop-blur rounded-full shadow-sm border border-blue-100 text-[10px] font-bold text-blue-600">
-          <Target className="w-3 h-3" />
-          {Math.round(rel * 100)}%
-        </div>
-      )}
+    <Link href={`/product/${product.id}`} style={{ display: 'block', height: '100%', textDecoration: 'none' }}>
+      <article className="card card-hover" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'pointer' }}>
 
-      {/* Превью PDF */}
-      <div className="relative aspect-[3/4] bg-gray-50 overflow-hidden border-b border-gray-100">
-        <div className="absolute inset-0 flex items-center justify-center scale-[0.35] origin-top transform transition-transform duration-500 group-hover:scale-[0.38]">
-          <Document file={product.document_url} loading={<div className="animate-pulse bg-gray-200 w-full h-full" />}>
-            <Page pageNumber={product.page_number} renderTextLayer={false} renderAnnotationLayer={false} width={500} />
-          </Document>
-        </div>
-        <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded text-[10px] font-medium text-gray-400">
-          Стор. {product.page_number}
-        </div>
-      </div>
-
-      <div className="p-4 flex flex-col flex-grow">
-        <div className="mb-2">
-          {product.sku && (
-            <span className="inline-block px-2 py-0.5 rounded bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider mb-1">
-              {product.sku}
+        {/* Image */}
+        <div style={{ height: 156, background: 'var(--bg-hover)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          {product.primary_image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={`data:image/png;base64,${product.primary_image}`} alt={product.title}
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', padding: 8, transition: 'transform .3s' }}
+              onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.06)')}
+              onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+            />
+          ) : (
+            <Package size={34} style={{ color: 'var(--text-3)' }} />
+          )}
+          {relevance !== undefined && (
+            <span className="badge badge-brand" style={{ position: 'absolute', top: 8, right: 8, fontSize: 11 }}>
+              {Math.round(relevance * 100)}%
             </span>
           )}
-          <h3 className="font-bold text-gray-900 leading-tight line-clamp-2 group-hover:text-blue-600 transition-colors">
+          {product.sku && (
+            <span className="badge badge-muted" style={{ position: 'absolute', bottom: 8, left: 8, fontSize: 10 }}>
+              <Tag size={9} />{product.sku}
+            </span>
+          )}
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '12px 13px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+          <h3 style={{
+            fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4,
+            overflow: 'hidden', display: '-webkit-box',
+            WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          }}>
             {product.title}
           </h3>
-        </div>
 
-        {/* Пояснение от ИИ в поиске */}
-        {res && (
-          <div className="mb-3 p-2 bg-amber-50/50 rounded-lg border border-amber-100/50 text-[11px] text-amber-800 flex gap-1.5">
-            <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0" />
-            <p className="leading-relaxed">{res}</p>
+          {reason && (
+            <p style={{ fontSize: 11, color: 'var(--brand-2)', lineHeight: 1.4,
+              overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+              {reason}
+            </p>
+          )}
+
+          {/* Technical attributes */}
+          {attrEntries.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+              {attrEntries.map(([k, v]) => (
+                <span key={k} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  padding: '2px 7px', borderRadius: 6,
+                  background: 'var(--bg-hover)', border: '1px solid var(--border)',
+                  fontSize: 10, whiteSpace: 'nowrap',
+                }}>
+                  <span style={{ color: 'var(--text-3)' }}>{ATTR_ICONS[k] || ''}{k}:</span>
+                  <span style={{ color: 'var(--text)', fontWeight: 700, fontFamily: 'monospace' }}>{v}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {!reason && !attrEntries.length && product.description && (
+            <p style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.4,
+              overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+              {product.description}
+            </p>
+          )}
+
+          {/* Footer */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            paddingTop: 8, borderTop: '1px solid var(--border)', marginTop: 'auto',
+          }}>
+            <span style={{ fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 3 }}>
+              <FileText size={10} />
+              {product.page_number ? `Ст. ${product.page_number}` : 'PDF'}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>→</span>
           </div>
-        )}
-
-        <p className="text-gray-500 text-xs line-clamp-2 mb-4 flex-grow italic">
-          {product.description || 'Опис відсутній'}
-        </p>
-
-        <div className="flex gap-2 pt-2 border-t border-gray-50">
-          <Link 
-            href={`/product/${product.id}`}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-900 text-white text-xs font-semibold rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Деталі
-          </Link>
-          <a 
-            href={product.document_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </a>
         </div>
-      </div>
-    </div>
-  );
-};
+      </article>
+    </Link>
+  )
+}
