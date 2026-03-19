@@ -159,12 +159,10 @@ async def delete_doc(doc_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.post("/clear-database")
 async def clear_database(db: AsyncSession = Depends(get_db)):
-    """Wipe all products, chunks, documents for re-import."""
-    await db.execute(text("DELETE FROM parse_logs"))
-    await db.execute(text("DELETE FROM import_logs"))
-    await db.execute(text("DELETE FROM product_images"))
-    await db.execute(text("DELETE FROM text_chunks"))
-    await db.execute(text("DELETE FROM products"))
-    await db.execute(text("DELETE FROM documents"))
+    """Wipe all data for re-import. TRUNCATE is atomic and fast."""
+    await db.execute(text(
+        "TRUNCATE TABLE parse_logs, import_logs, product_images, "
+        "text_chunks, products, documents RESTART IDENTITY CASCADE"
+    ))
     await db.commit()
     return {"status": "cleared"}

@@ -1,6 +1,7 @@
 """
-PDF Extractor — PyMuPDF for structure + Claude AI for Ukrainian technical data.
-Claude extracts: title (UA), description (UA), attributes (Тиск/Діаметр/Матеріал/Різьба).
+PDF Extractor — PyMuPDF + Claude AI Ukrainian extraction.
+IMPORTANT: Images stored as base64 only if < 50KB and only 1 per product.
+This prevents database disk overflow on Railway free tier.
 """
 
 import asyncio
@@ -27,12 +28,12 @@ try:
 except ImportError:
     _PIL_OK = False
 
-
-# ── Claude system prompt — forces Ukrainian output ────────────────────────────
+# Max image size to store in DB (bytes of base64). ~50KB raw = ~67KB base64
+MAX_IMAGE_BYTES = 50_000
+# Max images to store per document (not per product — just 1 total for preview)
+MAX_IMAGES_PER_DOC = 5
 
 UA_EXTRACTION_PROMPT = """Ти — система вилучення технічних даних для промислового каталогу TI-Katalog.
-Твоя задача: отримати структуровані дані ВИКЛЮЧНО УКРАЇНСЬКОЮ МОВОЮ, навіть якщо вхідний текст на іншій мові (EN, DE, PL).
-
 Відповідай ТІЛЬКИ валідним JSON масивом без пояснень:
 [
   {
@@ -40,10 +41,10 @@ UA_EXTRACTION_PROMPT = """Ти — система вилучення техні�
     "sku": "Артикул або null",
     "description": "Технічний опис товару українською (100-300 символів)",
     "attributes": {
-      "Тиск": "значення (PN16, 16 bar, 232 PSI тощо) або null",
-      "Діаметр": "значення (DN50, 50мм, 2 дюйми тощо) або null",
-      "Матеріал": "значення (Сталь, Нержавійка, Гума, Латунь тощо) або null",
-      "Різьба": "значення (BSP 1/2\", NPT, M12 тощо) або null",
+      "Тиск": "значення або null",
+      "Діаметр": "значення або null",
+      "Матеріал": "значення або null",
+      "Різьба": "значення або null",
       "Температура": "значення або null",
       "Довжина": "значення або null",
       "Стандарт": "значення або null"
@@ -51,25 +52,19 @@ UA_EXTRACTION_PROMPT = """Ти — система вилучення техні�
     "page_number": <номер сторінки>
   }
 ]
-
 Правила:
-- Якщо даних недостатньо для товару — не включай його
-- Мінімум 2 поля attributes мають бути не null для включення
-- Видаляй атрибути зі значенням null з фінального JSON
-- Заголовок ЗАВЖДИ українською
-- Якщо текст на EN: "Hydraulic hose" → "Гідравлічний шланг"
-- Якщо текст на DE: "Druckschlauch" → "Напірний шланг"
+- Мінімум 2 non-null атрибути для включення товару
+- Видаляй null атрибути з JSON
+- Назва ЗАВЖДИ українською (EN/DE → переклад)
+- Якщо на сторінці немає технічних товарів — поверни []
 """
 
 
 async def _claude_extract(page_text: str, page_num: int) -> List[Dict]:
-    """Call Claude to extract Ukrainian technical data from page text."""
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key or len(page_text.strip()) < 30:
         return []
-
     import httpx
-    user = f"Сторінка {page_num}:\n\n{page_text[:3000]}"
     try:
         async with httpx.AsyncClient(timeout=20) as c:
             r = await c.post(
@@ -78,7 +73,7 @@ async def _claude_extract(page_text: str, page_num: int) -> List[Dict]:
                     "model": "claude-opus-4-5",
                     "max_tokens": 1500,
                     "system": UA_EXTRACTION_PROMPT,
-                    "messages": [{"role": "user", "content": user}],
+                    "messages": [{"role": "user", "content": f"Сторінка {page_num}:\n\n{page_text[:3000]}"}],
                 },
                 headers={
                     "x-api-key": api_key,
@@ -91,21 +86,14 @@ async def _claude_extract(page_text: str, page_num: int) -> List[Dict]:
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
         items = json.loads(raw)
-        if isinstance(items, list):
-            return items
+        return items if isinstance(items, list) else []
     except Exception as e:
         logger.debug(f"Claude extract p{page_num}: {e}")
-    return []
+        return []
 
 
 def _regex_sku(text: str) -> Optional[str]:
-    patterns = [
-        r"\b([A-Z]{1,4}[-_]?\d{3,12})\b",
-        r"\bАрт[\.\s]*:?\s*([A-Z0-9\-]{4,20})\b",
-        r"\bSKU[\s:]+([A-Z0-9\-]{4,20})\b",
-        r"\b(\d{5,12})\b",
-    ]
-    for pat in patterns:
+    for pat in [r"\b([A-Z]{1,4}[-_]?\d{3,12})\b", r"\b(\d{6,12})\b"]:
         m = re.search(pat, text, re.IGNORECASE)
         if m:
             return m.group(1)
@@ -113,15 +101,13 @@ def _regex_sku(text: str) -> Optional[str]:
 
 
 def _regex_attrs(text: str) -> Dict[str, str]:
-    """Fallback regex attribute extraction for when Claude is unavailable."""
     attrs: Dict[str, str] = {}
     checks = {
-        "Тиск":       r"(?:PN|bar|PSI|MPa)\s*[\d\.]+|[\d\.]+\s*(?:bar|PSI|MPa|PN)",
-        "Діаметр":    r"(?:DN|d=|Ø)\s*[\d\.]+|[\d\.]+\s*(?:мм|mm|дюйм|inch)",
-        "Матеріал":   r"(?:Сталь|Steel|Нержав|Stainl|Гума|Rubber|Латунь|Brass|Поліамід|Polyamide)",
-        "Різьба":     r"(?:BSP|NPT|BSPT|M\d+|G\d+|UNF)",
-        "Температура":r"(?:-?\d+)\s*(?:°C|°F|C|F)",
-        "Довжина":    r"L\s*=?\s*[\d\.]+\s*(?:мм|мм|cm|м|m)\b",
+        "Тиск":       r"(?:PN|bar|PSI|MPa)\s*[\d\.]+|[\d\.]+\s*(?:bar|PSI|MPa)",
+        "Діаметр":    r"(?:DN|d=|Ø)\s*[\d\.]+|[\d\.]+\s*(?:мм|mm)",
+        "Матеріал":   r"(?:Сталь|Steel|Нержав|Stainl|Гума|Rubber|Латунь|Brass|Поліамід)",
+        "Різьба":     r"(?:BSP|NPT|BSPT|M\d+|G\d+)",
+        "Температура":r"(?:-?\d+)\s*°[CF]",
     }
     for name, pat in checks.items():
         m = re.search(pat, text, re.IGNORECASE)
@@ -130,16 +116,34 @@ def _regex_attrs(text: str) -> Dict[str, str]:
     return attrs
 
 
-# ── Main extraction ───────────────────────────────────────────────────────────
+def _compress_image(raw_bytes: bytes, max_bytes: int = MAX_IMAGE_BYTES) -> Optional[str]:
+    """Compress image and return base64 only if small enough."""
+    if not _PIL_OK:
+        b64 = base64.b64encode(raw_bytes).decode()
+        return b64 if len(b64) < max_bytes * 1.4 else None
+    try:
+        pil = _PIL.open(io.BytesIO(raw_bytes))
+        if pil.width < 60 or pil.height < 60:
+            return None
+        # Resize if too large
+        if pil.width > 400 or pil.height > 400:
+            pil.thumbnail((400, 400), _PIL.LANCZOS)
+        buf = io.BytesIO()
+        pil.convert("RGB").save(buf, "JPEG", quality=60, optimize=True)
+        compressed = buf.getvalue()
+        b64 = base64.b64encode(compressed).decode()
+        return b64 if len(b64) < max_bytes * 1.4 else None
+    except Exception:
+        return None
+
 
 async def extract_products_from_pdf(
     pdf_bytes: bytes,
     document_id: int,
     section_id: Optional[int],
 ) -> List[Dict]:
-    """Full pipeline: PDF parse → Claude AI → save to DB."""
     if not _FITZ:
-        raise RuntimeError("PyMuPDF not installed — pip install pymupdf")
+        raise RuntimeError("PyMuPDF not installed")
 
     from core.database import AsyncSessionLocal
     from models.models import Product, ProductImage, TextChunk
@@ -152,6 +156,7 @@ async def extract_products_from_pdf(
     page_count = len(doc)
     saved_products = []
     use_claude = bool(os.getenv("ANTHROPIC_API_KEY"))
+    images_stored = 0  # Track total images stored for this document
 
     async with AsyncSessionLocal() as db:
         for page_idx in range(page_count):
@@ -163,7 +168,7 @@ async def extract_products_from_pdf(
                 if not page_text or len(page_text) < 20:
                     continue
 
-                # Save raw text chunk
+                # Store text chunk (no images in text_chunks — saves space)
                 db.add(TextChunk(
                     document_id=document_id,
                     text=page_text[:2000],
@@ -171,44 +176,35 @@ async def extract_products_from_pdf(
                     block_type="page",
                 ))
 
-                # Extract images from this page
-                page_images = []
-                for img_info in page.get_images(full=True):
-                    xref = img_info[0]
-                    try:
-                        bi = doc.extract_image(xref)
-                        raw = bi["image"]
-                        w = h = 0
-                        if _PIL_OK:
-                            pil = _PIL.open(io.BytesIO(raw))
-                            if pil.width < 40 or pil.height < 40:
-                                continue
-                            w, h = pil.width, pil.height
-                            buf = io.BytesIO()
-                            pil.convert("RGB").save(buf, "PNG", optimize=True)
-                            raw = buf.getvalue()
-                        page_images.append({
-                            "data_b64": base64.b64encode(raw).decode(),
-                            "width": w, "height": h,
-                        })
-                    except Exception:
-                        continue
+                # Extract ONE small image per page (if under limit)
+                page_image_b64: Optional[str] = None
+                if images_stored < MAX_IMAGES_PER_DOC:
+                    for img_info in page.get_images(full=True)[:3]:  # Try first 3
+                        xref = img_info[0]
+                        try:
+                            bi = doc.extract_image(xref)
+                            compressed = _compress_image(bi["image"])
+                            if compressed:
+                                page_image_b64 = compressed
+                                images_stored += 1
+                                break
+                        except Exception:
+                            continue
 
-                # ── AI extraction (Claude) or regex fallback ──────────────
+                # AI or regex extraction
                 products_on_page = []
                 if use_claude:
                     try:
                         products_on_page = await _claude_extract(page_text, page_num)
-                        await asyncio.sleep(0.3)  # rate limit
+                        await asyncio.sleep(0.3)
                     except Exception as e:
                         logger.warning(f"Claude p{page_num}: {e}")
 
                 if not products_on_page:
-                    # Regex fallback: create one product per page
-                    sku   = _regex_sku(page_text)
+                    sku = _regex_sku(page_text)
                     attrs = _regex_attrs(page_text)
                     title = page_text.split("\n")[0].strip()[:200]
-                    if title and (sku or attrs):
+                    if title and (sku or len(attrs) >= 2):
                         products_on_page = [{
                             "title": title, "sku": sku,
                             "description": page_text[:300],
@@ -216,11 +212,10 @@ async def extract_products_from_pdf(
                             "page_number": page_num,
                         }]
 
-                # ── Save products ─────────────────────────────────────────
+                # Save products — only attach image to FIRST product on page
                 for pidx, item in enumerate(products_on_page):
                     if not item.get("title"):
                         continue
-                    # Clean null attributes
                     attrs_clean = {
                         k: v for k, v in (item.get("attributes") or {}).items()
                         if v and v != "null"
@@ -238,17 +233,15 @@ async def extract_products_from_pdf(
                     db.add(prod)
                     await db.flush()
 
-                    # Attach first image to first product on page
-                    if pidx == 0 and page_images:
-                        img = page_images[0]
+                    # Attach image only to first product on first pages
+                    if pidx == 0 and page_image_b64:
                         db.add(ProductImage(
                             product_id=prod.id,
-                            image_data=img["data_b64"],
+                            image_data=page_image_b64,
                             page_number=page_num,
-                            width=img["width"],
-                            height=img["height"],
                             is_primary=True,
                         ))
+                        page_image_b64 = None  # Use each image only once
 
                     saved_products.append({"id": prod.id, "_page_count": page_count})
 
@@ -259,5 +252,5 @@ async def extract_products_from_pdf(
         await db.commit()
 
     doc.close()
-    logger.info(f"Doc#{document_id}: {len(saved_products)} products from {page_count} pages")
+    logger.info(f"Doc#{document_id}: {len(saved_products)} products, {images_stored} images stored")
     return saved_products
