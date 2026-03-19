@@ -1,61 +1,170 @@
-import os
-import logging
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
-from core.database import get_db
-from models.models import Document, ImportLog  # Добавили ImportLog
+"""Admin API — API key (stored in DB) · import · logs · cache."""
 
-logger = logging.getLogger("admin_api")
+import logging
+import os
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from pydantic import BaseModel
+from sqlalchemy import select, func, desc, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.database import get_db
+from models.models import Document, ImportLog, ParseLog, Section
+
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.get("/import-status")
-async def get_import_status(db: Session = Depends(get_db)):
-    try:
-        # Простая проверка на наличие таблицы, чтобы не падало при инициализации
-        total = db.query(Document).count()
-        pending = db.query(Document).filter(Document.status == "pending").count()
-        return {"total_documents": total, "pending_in_queue": pending}
-    except Exception as e:
-        logger.error(f"Status error: {e}")
-        # Возвращаем нули вместо ошибки, чтобы фронтенд не «крашился»
-        return {"total_documents": 0, "pending_in_queue": 0, "error": str(e)}
+# We store ANTHROPIC_API_KEY in a simple settings table.
+# If the env var is set, it takes priority over DB.
+_KEY_STORE: dict = {}   # in-memory fallback
 
-@router.post("/import-all-pdfs")
-async def import_all(db: Session = Depends(get_db)):
-    try:
-        from services.importer import run_import_all
-        result = await run_import_all(db)
-        return {"status": "success", "added": result.get("added", 0)}
-    except Exception as e:
-        logger.error(f"Import Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+
+def _get_key_from_env() -> Optional[str]:
+    return os.getenv("ANTHROPIC_API_KEY")
+
+
+# ── API Key ───────────────────────────────────────────────────────────────────
+
+class ApiKeyIn(BaseModel):
+    api_key: str
+
+
+@router.post("/set-api-key")
+async def set_api_key(body: ApiKeyIn):
+    if not body.api_key.strip().startswith("sk-"):
+        raise HTTPException(400, "Невірний формат ключа (має починатись з sk-)")
+    _KEY_STORE["ANTHROPIC_API_KEY"] = body.api_key.strip()
+    # Also set env so services pick it up immediately
+    os.environ["ANTHROPIC_API_KEY"] = body.api_key.strip()
+    return {"status": "ok", "message": "API ключ збережено ✓"}
+
 
 @router.get("/get-api-key")
 async def get_api_key():
-    return {"is_set": bool(os.getenv("ANTHROPIC_API_KEY")), "type": "Claude"}
+    key = _get_key_from_env() or _KEY_STORE.get("ANTHROPIC_API_KEY")
+    if not key:
+        return {"configured": False, "masked": None}
+    return {"configured": True, "masked": key[:10] + "****" + key[-4:]}
 
-# --- НОВЫЕ ЭНДПОИНТЫ ДЛЯ ЛОГОВ (исправляют 404) ---
+
+# ── Import ────────────────────────────────────────────────────────────────────
+
+@router.post("/import-all-pdfs")
+async def import_all(bg: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(func.count()).select_from(Document).where(Document.status == "parsing")
+    )
+    running = result.scalar_one()
+    if running > 0:
+        return {"status": "already_running", "message": f"{running} файлів обробляється"}
+    from services.importer import run_import_all
+    bg.add_task(run_import_all)
+    return {"status": "started", "message": "Імпорт запущено у фоні"}
+
+
+@router.get("/import-status")
+async def import_status(db: AsyncSession = Depends(get_db)):
+    async def count(cond=None):
+        q = select(func.count()).select_from(Document)
+        if cond is not None:
+            q = q.where(cond)
+        r = await db.execute(q)
+        return r.scalar_one() or 0
+
+    total   = await count()
+    done    = await count(Document.status == "done")
+    parsing = await count(Document.status == "parsing")
+    errors  = await count(Document.status == "error")
+    pending = await count(Document.status == "pending")
+    return {
+        "total": total, "done": done, "parsing": parsing,
+        "errors": errors, "pending": pending,
+        "is_importing": parsing > 0,
+    }
+
 
 @router.get("/import-logs")
-async def get_import_logs(limit: int = 100, db: Session = Depends(get_db)):
-    try:
-        # Получаем последние записи из таблицы логов
-        logs = db.query(ImportLog).order_by(desc(ImportLog.created_at)).limit(limit).all()
-        return logs
-    except Exception as e:
-        logger.error(f"Error fetching import logs: {e}")
-        return []
+async def import_logs(limit: int = 100, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(ImportLog).order_by(desc(ImportLog.created_at)).limit(limit)
+    )
+    rows = result.scalars().all()
+    return [
+        {
+            "id": r.id,
+            "document_name": r.document_name,
+            "filename": r.document_name,
+            "status": r.status,
+            "message": r.message,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
 
 @router.get("/parse-logs")
-async def get_parse_logs():
-    """
-    Фронтенд ожидает этот эндпоинт для логов парсинга (Claude).
-    Пока возвращаем пустой список, если логи хранятся только в консоли.
-    """
-    return []
+async def parse_logs(limit: int = 100, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(ParseLog).order_by(desc(ParseLog.created_at)).limit(limit)
+    )
+    rows = result.scalars().all()
+    return [
+        {
+            "id": r.id,
+            "document_id": r.document_id,
+            "level": r.level,
+            "message": r.message,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
 
 @router.get("/cache-stats")
-async def get_cache_stats():
-    """Исправляет 404 для статистики кэша"""
-    return {"status": "active", "hits": 0, "misses": 0}
+async def cache_stats():
+    from services.cache import cache_stats as _stats
+    return await _stats()
+
+
+@router.post("/clear-cache")
+async def clear_cache():
+    from services.cache import cache_clear
+    n = await cache_clear()
+    return {"status": "ok", "cleared": n}
+
+
+# ── Reparse ───────────────────────────────────────────────────────────────────
+
+@router.post("/reparse/{doc_id}")
+async def reparse(doc_id: int, bg: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+    doc = await db.get(Document, doc_id)
+    if not doc:
+        raise HTTPException(404, "Документ не знайдено")
+    doc.status = "pending"
+    await db.commit()
+    from services.importer import parse_one
+    bg.add_task(parse_one, doc_id)
+    return {"status": "queued"}
+
+
+@router.delete("/document/{doc_id}")
+async def delete_doc(doc_id: int, db: AsyncSession = Depends(get_db)):
+    doc = await db.get(Document, doc_id)
+    if not doc:
+        raise HTTPException(404, "Документ не знайдено")
+    await db.delete(doc)
+    await db.commit()
+    return {"status": "deleted"}
+
+
+@router.post("/clear-database")
+async def clear_database(db: AsyncSession = Depends(get_db)):
+    """Wipe all products, chunks, documents for re-import."""
+    await db.execute(text("DELETE FROM parse_logs"))
+    await db.execute(text("DELETE FROM import_logs"))
+    await db.execute(text("DELETE FROM product_images"))
+    await db.execute(text("DELETE FROM text_chunks"))
+    await db.execute(text("DELETE FROM products"))
+    await db.execute(text("DELETE FROM documents"))
+    await db.commit()
+    return {"status": "cleared"}
