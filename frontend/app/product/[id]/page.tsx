@@ -11,24 +11,22 @@ const ATTR_ICONS: Record<string, string> = {
 
 export default function ProductPage({ params }: { params: { id: string } }) {
   const prodId = Number(params.id)
-  const [p,        setP]        = useState<Product | null>(null)
-  const [recs,     setRecs]     = useState<(Product & { reason: string })[]>([])
-  const [activeImg,setActiveImg]= useState(0)
-  const [loading,  setLoading]  = useState(true)
-  const [loadRecs, setLoadRecs] = useState(false)
-  const [docUrl,   setDocUrl]   = useState('')
+  const [p,         setP]        = useState<Product | null>(null)
+  const [recs,      setRecs]     = useState<(Product & { reason: string })[]>([])
+  const [activeImg, setActiveImg]= useState(0)
+  const [loading,   setLoading]  = useState(true)
+  const [loadRecs,  setLoadRecs] = useState(false)
+  const [docUrl,    setDocUrl]   = useState('')
 
   useEffect(() => {
     apiService.getProduct(prodId)
       .then(async prod => {
         setP(prod); setLoading(false)
-        // Build deep PDF link
         try {
           const doc = await apiService.getDocument(prod.document_id)
           const base = doc.file_url || doc.original_url || ''
           setDocUrl(prod.page_number ? `${base}#page=${prod.page_number}` : base)
         } catch {}
-        // Recommendations
         setLoadRecs(true)
         apiService.recommendations(prodId)
           .then(r => setRecs(r.recommendations as (Product & { reason: string })[]))
@@ -70,7 +68,6 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', padding: 16 }} />
             ) : <Package size={60} style={{ color: 'var(--text-3)' }} />}
           </div>
-
           {imgs.length > 1 && (
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
               {imgs.map((img, i) => (
@@ -85,8 +82,6 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               ))}
             </div>
           )}
-
-          {/* Deep PDF link */}
           {docUrl && (
             <a href={docUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ justifyContent: 'center' }}>
               <FileText size={14} />
@@ -102,7 +97,6 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           <h1 style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.25, letterSpacing: '-.02em' }}>{p.title}</h1>
           {p.description && <p style={{ color: 'var(--text-2)', lineHeight: 1.7, fontSize: 14 }}>{p.description}</p>}
 
-          {/* Technical attributes table */}
           {Object.keys(attrs).length > 0 && (
             <div className="card" style={{ overflow: 'hidden' }}>
               <div style={{ padding: '9px 16px', background: 'var(--bg-hover)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--text-3)', borderBottom: '1px solid var(--border)' }}>
@@ -112,10 +106,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <tbody>
                   {Object.entries(attrs).map(([k, v], i, arr) => (
                     <tr key={k} style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                      <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--text-3)', width: '42%', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span>{ATTR_ICONS[k] || '•'}</span>{k}
+                      <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--text-3)', width: '42%' }}>
+                        {ATTR_ICONS[k] || '•'} {k}
                       </td>
-                      <td style={{ padding: '10px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', color: 'var(--text)' }}>{v}</td>
+                      <td style={{ padding: '10px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace' }}>{v}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -123,7 +117,6 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             </div>
           )}
 
-          {/* Meta */}
           <div className="card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
             {p.page_number && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
@@ -157,7 +150,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   <div className="card card-hover" style={{ padding: 13, cursor: 'pointer' }}>
                     <div style={{ display: 'flex', gap: 7, marginBottom: 6 }}>
                       <Star size={11} style={{ color: 'var(--brand-2)', flexShrink: 0, marginTop: 2 }} />
-                      <p style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{r.title}</p>
+                      <p style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>{r.title}</p>
                     </div>
                     {r.sku && <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--text-3)' }}>{r.sku}</p>}
                     {r.reason && <p style={{ fontSize: 11, color: 'var(--brand-2)', marginTop: 5, lineHeight: 1.3 }}>{r.reason}</p>}

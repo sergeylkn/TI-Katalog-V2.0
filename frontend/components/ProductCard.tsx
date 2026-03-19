@@ -49,14 +49,14 @@ export function ProductCard({ product, relevance, reason }: {
           <h3 style={{
             fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4,
             overflow: 'hidden', display: '-webkit-box',
-            WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
           }}>
             {product.title}
           </h3>
 
           {reason && (
             <p style={{ fontSize: 11, color: 'var(--brand-2)', lineHeight: 1.4,
-              overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+              overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
               {reason}
             </p>
           )}
@@ -80,7 +80,7 @@ export function ProductCard({ product, relevance, reason }: {
 
           {!reason && !attrEntries.length && product.description && (
             <p style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.4,
-              overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+              overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
               {product.description}
             </p>
           )}
