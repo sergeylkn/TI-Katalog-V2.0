@@ -1,61 +1,84 @@
-"""TI-Katalog AI — FastAPI Backend (lightweight edition)"""
-import asyncio
+"""FastAPI main — TI-Katalog v5."""
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
-from core.database import engine
-from models.models import Base
+from sqlalchemy import text
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
 
 
-async def _wait_db(retries=30, delay=3.0):
-    for i in range(retries):
-        try:
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-            logger.info("✅ All DB tables ready")
-            return
-        except Exception as e:
-            if i < retries - 1:
-                logger.warning(f"⏳ DB not ready ({i+1}/{retries}): {type(e).__name__} — retry in {delay}s")
-                await asyncio.sleep(delay)
-            else:
-                raise
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("🚀 TI-Katalog AI starting…")
-    await _wait_db()
+    from core.database import engine
+    from models.models import Base
+    import asyncio
+
+    # Wait for PostgreSQL (Railway may need a moment after restart)
+    for attempt in range(30):
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            break
+        except Exception as e:
+            logger.info(f"⏳ DB not ready ({attempt+1}/30) — retry in 3s… ({e})")
+            await asyncio.sleep(3)
+
+    async with engine.begin() as conn:
+        # Enable pgvector extension (ignore if not available)
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            logger.info("✅ pgvector extension enabled")
+        except Exception as e:
+            logger.warning(f"pgvector not available: {e}")
+
+        # Create tables
+        await conn.run_sync(Base.metadata.create_all)
+
+        # Add embedding column if pgvector is available
+        try:
+            await conn.execute(text(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS embedding vector(1536)"
+            ))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_products_embedding "
+                "ON products USING hnsw (embedding vector_cosine_ops)"
+            ))
+            logger.info("✅ pgvector embedding column ready")
+        except Exception as e:
+            logger.info(f"Embedding column: {e}")
+
+    logger.info("✅ All DB tables ready")
     yield
-    logger.info("🛑 Shutdown")
+    await engine.dispose()
 
 
-app = FastAPI(title="TI-Katalog AI", version="3.0.0", lifespan=lifespan)
-app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(title="TI-Katalog API v5", lifespan=lifespan)
 
-from api.admin     import router as admin_router
-from api.documents import router as doc_router
-from api.products  import router as prod_router
-from api.search    import router as search_router
-from api.chat      import router as chat_router
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-app.include_router(admin_router,  prefix="/api/admin",     tags=["Admin"])
-app.include_router(doc_router,    prefix="/api/documents", tags=["Documents"])
-app.include_router(prod_router,   prefix="/api/products",  tags=["Products"])
-app.include_router(search_router, prefix="/api/search",    tags=["Search"])
-app.include_router(chat_router,   prefix="/api/chat",      tags=["Chat"])
+from api import admin, documents, products, search, chat
+
+app.include_router(admin.router,     prefix="/api/admin")
+app.include_router(documents.router, prefix="/api/documents")
+app.include_router(products.router,  prefix="/api/products")
+app.include_router(search.router,    prefix="/api/search")
+app.include_router(chat.router,      prefix="/api/chat")
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "3.0.0"}
+    return {"status": "ok", "version": "5"}
+
 
 @app.get("/")
 async def root():
-    return {"service": "TI-Katalog AI", "docs": "/docs"}
+    return {"name": "TI-Katalog API", "version": "5", "docs": "/docs"}

@@ -1,95 +1,141 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Loader2, FileText, Zap, Database } from 'lucide-react'
-import { apiService, SearchResult } from '@/lib/api'
-import debounce from 'debounce'
+import Navbar from '@/components/Navbar'
+import ProductCard from '@/components/ProductCard'
+import ChatWidget from '@/components/ChatWidget'
+import { api, type SearchResult } from '@/lib/api'
 
 export default function SearchPage() {
-  const [q, setQ] = useState('')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const q = searchParams.get('q') || ''
   const [results, setResults] = useState<SearchResult[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [source, setSource] = useState('')
-  const [searched, setSearched] = useState(false)
+  const [vectorUsed, setVectorUsed] = useState(false)
+  const [paramsDetected, setParamsDetected] = useState<any>({})
+  const [inputQ, setInputQ] = useState(q)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 20
 
-  const doSearch = useCallback(
-    debounce(async (query: string) => {
-      if (!query.trim()) { setResults([]); setSearched(false); return }
-      setLoading(true)
-      try {
-        const d = await apiService.search(query)
-        setResults(d.results); setSource(d.source); setSearched(true)
-      } catch { setResults([]) }
-      finally { setLoading(false) }
-    }, 400),
-    []
-  )
+  useEffect(() => {
+    setInputQ(q)
+    if (!q) return
+    setLoading(true)
+    setPage(1)
+    api.search(q, 1, PAGE_SIZE)
+      .then(r => {
+        setResults(r.items)
+        setTotal(r.total)
+        setVectorUsed(r.vector_used)
+        setParamsDetected(r.params_detected || {})
+      })
+      .catch(() => setResults([]))
+      .finally(() => setLoading(false))
+  }, [q])
+
+  const doSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (inputQ.trim()) router.push(`/search?q=${encodeURIComponent(inputQ.trim())}`)
+  }
+
+  const hasParams = Object.keys(paramsDetected).length > 0
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 16px' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 20 }}>
-        <Zap size={20} style={{ color: 'var(--brand-2)', verticalAlign: 'middle', marginRight: 6 }} />
-        AI Пошук
-      </h1>
+    <>
+      <Navbar />
+      <div className="container" style={{ paddingTop: 24, paddingBottom: 48 }}>
 
-      <div style={{ position: 'relative', marginBottom: 24 }}>
-        <Search size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)' }} />
-        {loading && <Loader2 size={15} style={{ position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)', animation: 'spin 1s linear infinite', color: 'var(--brand-2)' }} />}
-        <input
-          className="input"
-          style={{ paddingLeft: 38, height: 46, fontSize: 15 }}
-          placeholder="Пошук товарів… (наприклад: манометр 10 бар, DN50 шланг)"
-          value={q}
-          onChange={e => { setQ(e.target.value); doSearch(e.target.value) }}
-          autoFocus
-        />
-      </div>
+        {/* Search form */}
+        <form onSubmit={doSearch} style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+          <input
+            value={inputQ}
+            onChange={e => setInputQ(e.target.value)}
+            placeholder="Пошук по каталогу..."
+            style={{
+              flex: 1, padding: '11px 16px', fontSize: 14,
+              background: 'var(--card)', border: '1px solid var(--border2)',
+              borderRadius: 'var(--radius)', color: 'var(--text)',
+              fontFamily: 'var(--font-sans)', outline: 'none',
+            }}
+          />
+          <button type="submit" className="btn btn-primary">Знайти</button>
+        </form>
 
-      {source && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, fontSize: 11, color: 'var(--text-3)' }}>
-          {source.includes('ai') ? <Zap size={10} style={{ color: 'var(--brand-2)' }} /> : <Database size={10} />}
-          {source.includes('ai') ? 'AI + PostgreSQL пошук' : 'PostgreSQL пошук'}
-          {' · '}{results.length} результатів
-        </div>
-      )}
+        {/* Status bar */}
+        {q && !loading && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            marginBottom: 20, flexWrap: 'wrap'
+          }}>
+            <span style={{ fontSize: 14, color: 'var(--text2)' }}>
+              <strong style={{ color: 'var(--text)' }}>{total}</strong> результатів для «{q}»
+            </span>
+            {vectorUsed && (
+              <span style={{
+                fontSize: 11, background: '#E6F1FB', color: '#185FA5',
+                padding: '2px 8px', borderRadius: 4, fontWeight: 600
+              }}>
+                🔮 Семантичний пошук
+              </span>
+            )}
+            {hasParams && (
+              <span style={{ fontSize: 12, color: 'var(--text3)' }}>
+                Виявлено: {Object.entries(paramsDetected).map(([k, v]) => `${k}=${v}`).join(', ')}
+              </span>
+            )}
+          </div>
+        )}
 
-      {searched && results.length === 0 && !loading && (
-        <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>
-          Нічого не знайдено за «{q}»
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {results.map((r, i) => (
-          <Link key={r.id} href={`/product/${r.id}`} style={{ textDecoration: 'none' }}>
-            <div className={`card card-hover anim-up s${Math.min(i+1,6)}`} style={{ padding: '14px 16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 14, fontWeight: 700 }}>{r.title}</span>
-                    {r.sku && <span className="badge badge-muted">{r.sku}</span>}
-                  </div>
-                  {r.description && <p style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>{r.description}</p>}
-                  {Object.keys(r.attributes || {}).length > 0 && (
-                    <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                      {Object.entries(r.attributes).slice(0, 4).map(([k, v]) => (
-                        <span key={k} style={{ fontSize: 10, color: 'var(--text-3)' }}>{k}: <b style={{ color: 'var(--text-2)' }}>{v}</b></span>
-                      ))}
+        {loading ? (
+          <div className="loader-wrap" style={{ minHeight: 300 }}><div className="spinner" /></div>
+        ) : !q ? (
+          <div className="loader-wrap" style={{ minHeight: 300 }}>
+            <p style={{ color: 'var(--text3)' }}>Введіть запит для пошуку</p>
+          </div>
+        ) : results.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <p style={{ fontSize: 18, color: 'var(--text2)', marginBottom: 8 }}>Нічого не знайдено</p>
+            <p style={{ fontSize: 14, color: 'var(--text3)', marginBottom: 24 }}>
+              Спробуйте інший запит або перегляньте каталог
+            </p>
+            <Link href="/" className="btn btn-ghost">← До каталогу</Link>
+          </div>
+        ) : (
+          <>
+            <div className="prod-grid">
+              {results.map(r => (
+                <div key={r.id} style={{ position: 'relative' }}>
+                  <ProductCard product={r} />
+                  {r._match && (
+                    <div style={{ position: 'absolute', top: 8, left: 8 }}>
+                      <span className={`match-badge match-${r._match}`}>
+                        {r._match === 'sku' ? '🎯 SKU' : r._match === 'vector' ? '🔮 AI' : '📝 текст'}
+                      </span>
                     </div>
                   )}
                 </div>
-                <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                  {r.page_number && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-3)' }}>
-                      <FileText size={10} /> стор. {r.page_number}
-                    </span>
-                  )}
-                </div>
-              </div>
+              ))}
             </div>
-          </Link>
-        ))}
+
+            {total > PAGE_SIZE && (
+              <div className="pagination" style={{ marginTop: 32 }}>
+                <button className="page-btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}>◀</button>
+                <span style={{ fontSize: 13, color: 'var(--text2)', padding: '0 12px' }}>
+                  Стор. {page} з {Math.ceil(total / PAGE_SIZE)}
+                </span>
+                <button className="page-btn" disabled={page >= Math.ceil(total / PAGE_SIZE)} onClick={() => setPage(p => p + 1)}>▶</button>
+              </div>
+            )}
+          </>
+        )}
       </div>
-    </div>
+      <footer className="footer">
+        <p>© 2025 TI-Katalог · Tubes International Україна</p>
+      </footer>
+      <ChatWidget />
+    </>
   )
 }

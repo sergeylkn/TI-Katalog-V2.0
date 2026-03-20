@@ -1,46 +1,77 @@
-"""Documents & Sections API."""
+"""Documents + Categories API."""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
-from models.models import Document, Section
+from models.models import Document, Section, Category, Product
 
 router = APIRouter()
 
 
-@router.get("/sections")
-async def get_sections(db: AsyncSession = Depends(get_db)):
-    r = await db.execute(select(Section).order_by(Section.name))
-    secs = r.scalars().all()
+@router.get("/categories")
+async def list_categories(db: AsyncSession = Depends(get_db)):
+    cats = (await db.execute(select(Category).order_by(Category.name))).scalars().all()
     result = []
-    for s in secs:
-        cnt = (await db.execute(
-            select(func.count()).select_from(Document).where(Document.section_id == s.id)
+    for cat in cats:
+        # Count products in this category
+        count = (await db.execute(
+            select(func.count(Product.id)).where(Product.category_id == cat.id)
         )).scalar_one()
-        result.append({"id": s.id, "name": s.name, "slug": s.slug, "document_count": cnt})
+        # Count sections
+        sec_count = (await db.execute(
+            select(func.count(Section.id)).where(Section.category_id == cat.id)
+        )).scalar_one()
+        result.append({
+            "id": cat.id, "name": cat.name, "slug": cat.slug,
+            "icon": cat.icon or "📦", "description": cat.description or "",
+            "product_count": count, "section_count": sec_count,
+        })
     return result
+
+
+@router.get("/categories/{slug}")
+async def get_category(slug: str, db: AsyncSession = Depends(get_db)):
+    cat = (await db.execute(
+        select(Category).where(Category.slug == slug)
+    )).scalar_one_or_none()
+    if not cat:
+        raise HTTPException(404)
+    sections = (await db.execute(
+        select(Section).where(Section.category_id == cat.id).order_by(Section.name)
+    )).scalars().all()
+    secs = []
+    for sec in sections:
+        count = (await db.execute(
+            select(func.count(Product.id)).where(Product.section_id == sec.id)
+        )).scalar_one()
+        secs.append({
+            "id": sec.id, "name": sec.name, "slug": sec.slug,
+            "description": sec.description or "", "product_count": count,
+        })
+    return {
+        "id": cat.id, "name": cat.name, "slug": cat.slug,
+        "icon": cat.icon or "📦", "sections": secs
+    }
+
+
+@router.get("/sections")
+async def list_sections(db: AsyncSession = Depends(get_db)):
+    secs = (await db.execute(select(Section).order_by(Section.name))).scalars().all()
+    return [{"id": s.id, "name": s.name, "slug": s.slug,
+             "category_id": s.category_id} for s in secs]
 
 
 @router.get("/")
 async def list_documents(db: AsyncSession = Depends(get_db)):
-    r = await db.execute(select(Document).order_by(Document.created_at.desc()).limit(200))
-    docs = r.scalars().all()
-    return [_doc(d) for d in docs]
+    docs = (await db.execute(select(Document).order_by(Document.name))).scalars().all()
+    return [{"id": d.id, "name": d.name, "status": d.status,
+             "page_count": d.page_count} for d in docs]
 
 
 @router.get("/{doc_id}")
 async def get_document(doc_id: int, db: AsyncSession = Depends(get_db)):
-    d = await db.get(Document, doc_id)
-    if not d:
-        raise HTTPException(404, "Not found")
-    return _doc(d)
-
-
-def _doc(d: Document):
-    return {
-        "id": d.id, "name": d.name, "file_url": d.file_url,
-        "status": d.status, "section_id": d.section_id,
-        "page_count": d.page_count, "error_msg": d.error_msg,
-        "parsed_at": d.parsed_at.isoformat() if d.parsed_at else None,
-        "created_at": d.created_at.isoformat() if d.created_at else None,
-    }
+    doc = await db.get(Document, doc_id)
+    if not doc:
+        raise HTTPException(404)
+    return {"id": doc.id, "name": doc.name, "file_url": doc.file_url,
+            "status": doc.status, "page_count": doc.page_count}

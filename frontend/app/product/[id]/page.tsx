@@ -1,111 +1,256 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, FileText, Tag, ExternalLink, Loader2, Zap } from 'lucide-react'
-import { apiService, Product } from '@/lib/api'
+import Navbar from '@/components/Navbar'
+import ProductCard from '@/components/ProductCard'
+import PdfModal from '@/components/PdfModal'
+import ChatWidget from '@/components/ChatWidget'
+import { api, type Product } from '@/lib/api'
 
-const ICONS: Record<string,string> = { 'Тиск':'⚡','Діаметр':'⭕','Матеріал':'🔩','Різьба':'🔧','Температура':'🌡️','Довжина':'📏','Стандарт':'📋' }
-
-export default function ProductPage({ params }: { params: { id: string } }) {
-  const id = Number(params.id)
-  const [p, setP] = useState<(Product & {document_url:string,original_url?:string}) | null>(null)
-  const [recs, setRecs] = useState<(Product&{reason:string})[]>([])
+export default function ProductPage() {
+  const { id } = useParams<{ id: string }>()
+  const [p, setP] = useState<Product | null>(null)
+  const [recs, setRecs] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [imgErr, setImgErr] = useState(false)
+  const [pdfOpen, setPdfOpen] = useState(false)
+  const [showAllVariants, setShowAllVariants] = useState(false)
 
   useEffect(() => {
-    apiService.getProduct(id)
+    if (!id) return
+    const numId = Number(id)
+    api.getProduct(numId)
       .then(prod => {
-        setP(prod); setLoading(false)
-        apiService.recommendations(id).then(r => setRecs(r.recommendations as (Product&{reason:string})[])).catch(()=>{})
+        setP(prod)
+        setLoading(false)
+        api.recommendations(numId).then(r => setRecs(r.recommendations)).catch(() => {})
       })
       .catch(() => setLoading(false))
   }, [id])
 
-  if (loading) return <div style={{ display:'flex', justifyContent:'center', padding:80 }}><Loader2 size={26} style={{ animation:'spin 1s linear infinite', color:'var(--brand-2)' }} /></div>
-  if (!p) return <div style={{ textAlign:'center', padding:80 }}><p style={{ color:'var(--text-2)' }}>Товар не знайдено</p><Link href="/" className="btn btn-ghost" style={{ marginTop:16 }}>← Головна</Link></div>
+  if (loading) return (
+    <>
+      <Navbar />
+      <div className="loader-wrap" style={{ minHeight: '60vh' }}><div className="spinner" /></div>
+    </>
+  )
+
+  if (!p) return (
+    <>
+      <Navbar />
+      <div className="loader-wrap" style={{ minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ color: 'var(--text2)', marginBottom: 16 }}>Товар не знайдено</p>
+          <Link href="/" className="btn btn-ghost">← Головна</Link>
+        </div>
+      </div>
+    </>
+  )
 
   const attrs = Object.entries(p.attributes || {})
-  const pdfUrl = p.document_url || p.original_url
+  const variants = p.variants || []
+  const variantCols = variants.length > 0
+    ? Object.keys(variants[0]).filter(k => k !== '_sku').slice(0, 10)
+    : []
+  const displayVariants = showAllVariants ? variants : variants.slice(0, 8)
+  const pdfUrl = p.document_url
+  const imageApiUrl = api.imageUrl(p.id)
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 16px' }}>
-      <Link href="/" style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:13, color:'var(--text-2)', textDecoration:'none', marginBottom:22 }}>
-        <ArrowLeft size={13} /> Назад
-      </Link>
+    <>
+      <Navbar />
+      <div className="container" style={{ paddingTop: 24, paddingBottom: 48 }}>
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:32 }}>
-        {/* Left — PDF preview */}
-        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-          <div className="card" style={{ height:280, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12 }}>
-            <FileText size={52} style={{ color:'var(--brand)', opacity:.5 }} />
-            <p style={{ fontSize:12, color:'var(--text-3)', textAlign:'center', maxWidth:180 }}>
-              Зображення зберігаються в PDF.<br />Відкрийте документ нижче.
-            </p>
-          </div>
-          {pdfUrl && (
-            <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ justifyContent:'center' }}>
-              <FileText size={14} />
-              {p.page_number ? `Відкрити PDF (ст. ${p.page_number})` : 'Відкрити PDF'}
-              <ExternalLink size={11} />
-            </a>
-          )}
-          {p.page_number && pdfUrl && (
-            <Link href={`/pdf/${p.document_id}?page=${p.page_number}`} className="btn btn-ghost" style={{ justifyContent:'center' }}>
-              Переглянути в PDF Viewer
-            </Link>
-          )}
+        {/* Breadcrumbs */}
+        <div className="breadcrumbs">
+          <Link href="/">Головна</Link>
+          <span className="breadcrumbs-sep">›</span>
+          <Link href="/">Каталог</Link>
+          <span className="breadcrumbs-sep">›</span>
+          <span>{p.title}</span>
         </div>
 
-        {/* Right — Details */}
-        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          {p.sku && <span className="badge badge-brand" style={{ alignSelf:'flex-start' }}><Tag size={10} />{p.sku}</span>}
-          <h1 style={{ fontSize:20, fontWeight:800, lineHeight:1.3 }}>{p.title}</h1>
-          {p.description && <p style={{ color:'var(--text-2)', fontSize:13, lineHeight:1.7 }}>{p.description}</p>}
+        {/* Main layout */}
+        <div className="product-layout" style={{ marginTop: 16 }}>
 
-          {attrs.length > 0 && (
-            <div className="card" style={{ overflow:'hidden' }}>
-              <div style={{ padding:'8px 14px', background:'var(--bg-hover)', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.07em', color:'var(--text-3)', borderBottom:'1px solid var(--border)' }}>
-                ⚙️ Технічні характеристики
+          {/* LEFT — image + PDF */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Product image from PDF */}
+            <div
+              className="product-img-wrap"
+              onClick={() => pdfUrl && setPdfOpen(true)}
+              title="Клік — відкрити PDF"
+            >
+              {p.image_url && !imgErr ? (
+                <img
+                  src={imageApiUrl}
+                  alt={p.title}
+                  onError={() => setImgErr(true)}
+                />
+              ) : (
+                <div className="product-img-placeholder">
+                  <span style={{ fontSize: 52, opacity: .3 }}>📄</span>
+                  <span style={{ fontSize: 13 }}>Зображення з PDF</span>
+                  {p.page_number && (
+                    <span style={{ fontSize: 11, color: 'var(--text3)' }}>Сторінка {p.page_number}</span>
+                  )}
+                </div>
+              )}
+              {pdfUrl && (
+                <div className="product-pdf-btn">
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={e => { e.stopPropagation(); setPdfOpen(true) }}
+                  >
+                    📄 {p.page_number ? `Відкрити PDF (ст. ${p.page_number})` : 'Відкрити PDF'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Direct PDF link */}
+            {pdfUrl && (
+              <a
+                href={p.page_number ? `${pdfUrl}#page=${p.page_number}` : pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-ghost"
+                style={{ justifyContent: 'center' }}
+              >
+                Відкрити у новій вкладці ↗
+              </a>
+            )}
+          </div>
+
+          {/* RIGHT — product info */}
+          <div className="product-info">
+            {p.sku && <div className="product-sku">{p.sku}</div>}
+            <h1 className="product-title">{p.title}</h1>
+            {p.subtitle && <p className="product-subtitle">{p.subtitle}</p>}
+
+            {/* Technical attributes */}
+            {attrs.length > 0 && (
+              <div className="attrs-table">
+                {attrs.map(([k, v]) => (
+                  <div key={k} className="attr-row">
+                    <span className="attr-label">{k}</span>
+                    <span className="attr-value">{String(v)}</span>
+                  </div>
+                ))}
               </div>
-              <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            )}
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {pdfUrl && (
+                <button className="btn btn-primary" onClick={() => setPdfOpen(true)}>
+                  📄 Переглянути PDF
+                </button>
+              )}
+              <Link href="/" className="btn btn-ghost">← Каталог</Link>
+            </div>
+
+            {/* Page indicator */}
+            {p.page_number && (
+              <p style={{ fontSize: 12, color: 'var(--text3)' }}>
+                □ Сторінка PDF: {p.page_number}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Description */}
+        {p.description && (
+          <div className="card" style={{ marginTop: 28 }}>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 20, marginBottom: 12 }}>
+              Опис та застосування
+            </h2>
+            <p style={{ fontSize: 14, lineHeight: 1.75, color: 'var(--text)', whiteSpace: 'pre-line' }}>
+              {p.description}
+            </p>
+          </div>
+        )}
+
+        {/* Variants table */}
+        {variants.length > 0 && variantCols.length > 0 && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 20 }}>
+                Доступні розміри
+                <span style={{ fontSize: 13, fontFamily: 'var(--font-sans)', fontWeight: 400, color: 'var(--text3)', marginLeft: 8 }}>
+                  {variants.length} варіантів
+                </span>
+              </h2>
+            </div>
+            <div className="variants-table-wrap">
+              <table className="variants-table">
+                <thead>
+                  <tr>{variantCols.map(col => <th key={col}>{col}</th>)}</tr>
+                </thead>
                 <tbody>
-                  {attrs.map(([k,v],i,a) => (
-                    <tr key={k} style={{ borderBottom: i<a.length-1 ? '1px solid var(--border)' : 'none' }}>
-                      <td style={{ padding:'9px 14px', fontSize:12, color:'var(--text-3)', width:'42%' }}>{ICONS[k]||'•'} {k}</td>
-                      <td style={{ padding:'9px 14px', fontSize:12, fontWeight:700, fontFamily:'monospace' }}>{v}</td>
+                  {displayVariants.map((v, i) => (
+                    <tr key={i}>
+                      {variantCols.map(col => (
+                        <td key={col}>{v[col] || '—'}</td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          )}
+            {variants.length > 8 && (
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ marginTop: 12 }}
+                onClick={() => setShowAllVariants(!showAllVariants)}
+              >
+                {showAllVariants ? '▲ Згорнути' : `▼ Показати всі ${variants.length} варіантів`}
+              </button>
+            )}
+          </div>
+        )}
 
-          {p.page_number && (
-            <div style={{ fontSize:12, color:'var(--text-3)' }}>
-              📄 Сторінка PDF: <b style={{ color:'var(--text-2)', fontFamily:'monospace' }}>{p.page_number}</b>
+        {/* Certifications */}
+        {p.certifications && (
+          <div className="cert-block" style={{ marginTop: 20 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <span style={{ fontSize: 16 }}>🛡</span>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Сертифікати та стандарти</div>
+                <div>{p.certifications}</div>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Recommendations */}
+        {recs.length > 0 && (
+          <div style={{ marginTop: 40 }}>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 24, marginBottom: 16 }}>
+              Схожі товари
+            </h2>
+            <div className="prod-grid">
+              {recs.map(r => <ProductCard key={r.id} product={r} />)}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Recommendations */}
-      {recs.length > 0 && (
-        <section style={{ marginTop:40 }}>
-          <h2 style={{ fontSize:16, fontWeight:700, marginBottom:14, display:'flex', alignItems:'center', gap:6 }}>
-            <Zap size={15} style={{ color:'var(--brand-2)' }} /> Схожі товари
-          </h2>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(190px,1fr))', gap:10 }}>
-            {recs.map(r => (
-              <Link key={r.id} href={`/product/${r.id}`} style={{ textDecoration:'none' }}>
-                <div className="card card-hover" style={{ padding:12 }}>
-                  <p style={{ fontSize:12, fontWeight:600, lineHeight:1.35, marginBottom:4, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' as const }}>{r.title}</p>
-                  {r.sku && <p style={{ fontSize:10, fontFamily:'monospace', color:'var(--text-3)' }}>{r.sku}</p>}
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
+      {/* PDF Modal */}
+      {pdfOpen && pdfUrl && (
+        <PdfModal
+          pdfUrl={pdfUrl}
+          pageNumber={p.page_number || 1}
+          title={p.title}
+          onClose={() => setPdfOpen(false)}
+        />
       )}
-    </div>
+
+      <footer className="footer">
+        <p>© 2025 TI-Katalог · Tubes International Україна</p>
+      </footer>
+      <ChatWidget />
+    </>
   )
 }

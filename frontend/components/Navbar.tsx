@@ -1,74 +1,136 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Search, Settings, Layers, ChevronDown, X, Menu } from 'lucide-react'
-import { apiService, Section } from '@/lib/api'
+import { useRouter } from 'next/navigation'
+import { api } from '@/lib/api'
 
-export function Navbar() {
-  const path = usePathname()
-  const [sections, setSections] = useState<Section[]>([])
-  const [catOpen, setCatOpen] = useState(false)
-  const [mobile, setMobile] = useState(false)
+const T: Record<string, Record<string, string>> = {
+  ua: {
+    catalog: 'Каталог', search: 'Пошук...', hint: 'UA · PL · EN',
+    placeholder: 'Пошук: шланг DN65, FT-CRISTALLO...',
+    shop: 'Онлайн магазин →', contact: 'tubes@tubes-international.com',
+  },
+  pl: {
+    catalog: 'Katalog', search: 'Szukaj...', hint: 'UA · PL · EN',
+    placeholder: 'Szukaj: wąż DN65, FT-CRISTALLO...',
+    shop: 'Sklep online →', contact: 'tubes@tubes-international.com',
+  },
+}
 
-  useEffect(() => { apiService.getSections().then(setSections).catch(() => {}) }, [])
+export default function Navbar() {
+  const [lang, setLang] = useState<'ua'|'pl'>('ua')
+  const [dark, setDark] = useState(false)
+  const [q, setQ] = useState('')
+  const [suggs, setSuggs] = useState<any[]>([])
+  const [suggOpen, setSuggOpen] = useState(false)
+  const router = useRouter()
+  const timer = useRef<any>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
 
-  const nav: React.CSSProperties = {
-    position: 'sticky', top: 0, zIndex: 100, background: 'rgba(15,17,23,.95)',
-    backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)',
+  const t = T[lang]
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+  }, [dark])
+
+  useEffect(() => {
+    if (q.length < 2) { setSuggs([]); setSuggOpen(false); return }
+    clearTimeout(timer.current)
+    timer.current = setTimeout(async () => {
+      try {
+        const r = await api.suggest(q)
+        setSuggs(r.suggestions || [])
+        setSuggOpen(r.suggestions.length > 0)
+      } catch {}
+    }, 300)
+  }, [q])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setSuggOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const doSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (q.trim()) router.push(`/search?q=${encodeURIComponent(q.trim())}`)
+    setSuggOpen(false)
   }
-  const lnk = (p: string): React.CSSProperties => ({
-    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px',
-    borderRadius: 7, fontSize: 13, fontWeight: 500, textDecoration: 'none',
-    color: path === p ? 'var(--text)' : 'var(--text-2)',
-    background: path === p ? 'var(--bg-hover)' : 'transparent',
-    cursor: 'pointer', border: 'none',
-  })
 
   return (
-    <nav style={nav}>
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 16px', display: 'flex', alignItems: 'center', height: 52, gap: 4 }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', marginRight: 8 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--brand-grad)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, color: '#fff' }}>TI</div>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>TI-Katalog</span>
-        </Link>
-
-        <div className="hidden md:flex" style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          {/* Catalog dropdown */}
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => setCatOpen(v => !v)} style={{ ...lnk('/catalog'), display: 'inline-flex' }}>
-              <Layers size={13} /> Каталог <ChevronDown size={11} />
-            </button>
-            {catOpen && sections.length > 0 && (
-              <div className="card" style={{ position: 'absolute', top: '100%', left: 0, minWidth: 260, zIndex: 200, padding: '4px 0', marginTop: 4 }}>
-                {sections.map(s => (
-                  <Link key={s.id} href={`/catalog/${s.slug}?id=${s.id}`} onClick={() => setCatOpen(false)}
-                    style={{ display: 'block', padding: '8px 14px', fontSize: 12, color: 'var(--text-2)', textDecoration: 'none' }}
-                    onMouseEnter={e => (e.currentTarget.style.color='var(--text)', e.currentTarget.style.background='var(--bg-hover)')}
-                    onMouseLeave={e => (e.currentTarget.style.color='var(--text-2)', e.currentTarget.style.background='transparent')}>
-                    {s.name}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-          <Link href="/search" style={lnk('/search')}><Search size={13} /> Пошук</Link>
-          <Link href="/admin"  style={lnk('/admin')}><Settings size={13} /> Адмін</Link>
-        </div>
-
-        <div style={{ marginLeft: 'auto' }}>
-          <button className="md:hidden" onClick={() => setMobile(v => !v)} style={{ ...lnk(''), padding: '6px' }}>
-            {mobile ? <X size={16} /> : <Menu size={16} />}
-          </button>
+    <>
+      {/* Top bar */}
+      <div className="topbar">
+        <span>📍 {lang === 'ua' ? 'Промисловий каталог · Україна' : 'Katalog przemysłowy · Ukraina'}</span>
+        <div className="topbar-right">
+          <a href="mailto:tubes@tubes-international.com">{t.contact}</a>
+          <a href="https://sklep.tubes-international.pl" target="_blank" rel="noopener noreferrer" className="topbar-shop">{t.shop}</a>
         </div>
       </div>
-      {mobile && (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '8px 16px 12px' }}>
-          <Link href="/"       onClick={() => setMobile(false)} style={{ ...lnk('/'), display: 'flex', marginBottom: 4 }}>Головна</Link>
-          <Link href="/search" onClick={() => setMobile(false)} style={{ ...lnk('/search'), display: 'flex', marginBottom: 4 }}><Search size={13} /> Пошук</Link>
-          <Link href="/admin"  onClick={() => setMobile(false)} style={{ ...lnk('/admin'),  display: 'flex' }}><Settings size={13} /> Адмін</Link>
+
+      {/* Main navbar */}
+      <nav className="navbar">
+        <Link href="/" className="nav-logo">TI<span>·</span>Каталог</Link>
+
+        <div className="nav-links">
+          <Link href="/" className="nav-link">{t.catalog}</Link>
+          <Link href="/catalog/shlanhy-dlya-promyslovosti" className="nav-link">
+            {lang === 'ua' ? 'Шланги' : 'Węże'}
+          </Link>
+          <Link href="/catalog/promyslova-armatura" className="nav-link">
+            {lang === 'ua' ? 'Арматура' : 'Armatura'}
+          </Link>
+          <Link href="/catalog/sylova-hidravlika" className="nav-link">
+            {lang === 'ua' ? 'Гідравліка' : 'Hydraulika'}
+          </Link>
+          <Link href="/catalog/promyslova-pnevmatyka" className="nav-link">
+            {lang === 'ua' ? 'Пневматика' : 'Pneumatyka'}
+          </Link>
         </div>
-      )}
-    </nav>
+
+        {/* Search */}
+        <div className="nav-search" ref={wrapRef}>
+          <form onSubmit={doSearch}>
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder={t.placeholder}
+              autoComplete="off"
+            />
+            <button type="submit" className="nav-search-btn">⌕</button>
+          </form>
+          <div className={`search-suggestions ${suggOpen ? 'open' : ''}`}>
+            {suggs.map((s, i) => (
+              <div key={i} className="sugg-item" onClick={() => {
+                router.push(`/product/${s.id}`)
+                setSuggOpen(false)
+                setQ(s.title)
+              }}>
+                <span className="sugg-type">{s.sku ? 'SKU' : 'Товар'}</span>
+                <span>{s.title}</span>
+                {s.sku && <span className="sugg-sku">{s.sku}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="nav-controls">
+          <button className={`lang-btn ${lang === 'ua' ? 'active' : ''}`} onClick={() => setLang('ua')}>
+            🇺🇦 UA
+          </button>
+          <button className={`lang-btn ${lang === 'pl' ? 'active' : ''}`} onClick={() => setLang('pl')}>
+            🇵🇱 PL
+          </button>
+          <button className="theme-btn" onClick={() => setDark(!dark)}>
+            {dark ? '☀️' : '🌙'}
+          </button>
+        </div>
+      </nav>
+    </>
   )
 }

@@ -1,42 +1,40 @@
 'use client'
 import Link from 'next/link'
-import { FileText, Tag } from 'lucide-react'
-import { Product } from '@/lib/api'
+import { useState } from 'react'
+import type { Product } from '@/lib/api'
+import { api } from '@/lib/api'
 
-export function ProductCard({ product: p }: { product: Product }) {
-  const attrs = Object.entries(p.attributes || {}).slice(0, 3)
+export default function ProductCard({ product: p }: { product: Product }) {
+  const [imgErr, setImgErr] = useState(false)
+
   return (
-    <Link href={`/product/${p.id}`} style={{ textDecoration: 'none' }}>
-      <div className="card card-hover" style={{ padding: 14, height: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {/* PDF icon placeholder */}
-        <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-hover)', borderRadius: 8 }}>
-          <FileText size={28} style={{ color: 'var(--brand)', opacity: .6 }} />
-        </div>
-
-        <div style={{ flex: 1 }}>
-          {p.sku && (
-            <div className="badge badge-muted" style={{ marginBottom: 5 }}>
-              <Tag size={9} />{p.sku}
-            </div>
-          )}
-          <p style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
-            {p.title}
-          </p>
-        </div>
-
-        {attrs.length > 0 && (
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 7, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {attrs.map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-3)' }}>
-                <span>{k}</span>
-                <span style={{ color: 'var(--text-2)', fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>
-              </div>
-            ))}
+    <Link href={`/product/${p.id}`} className="prod-card">
+      <div className="prod-img">
+        {p.image_url && !imgErr ? (
+          <img
+            src={api.imageUrl(p.id)}
+            alt={p.title}
+            onError={() => setImgErr(true)}
+            loading="lazy"
+          />
+        ) : (
+          <div className="prod-img-placeholder">
+            <span className="prod-img-icon">📄</span>
+            <span>{p.page_number ? `Ст. ${p.page_number}` : 'PDF'}</span>
           </div>
         )}
-
-        {p.page_number && (
-          <div style={{ fontSize: 10, color: 'var(--text-3)' }}>стор. {p.page_number}</div>
+        <span className="prod-zoom">🔍 PDF</span>
+      </div>
+      <div className="prod-body">
+        {p.sku && <span className="prod-sku">{p.sku}</span>}
+        <div className="prod-title">{p.title}</div>
+        {p.subtitle && <div className="prod-sub">{p.subtitle}</div>}
+        {Object.keys(p.attributes || {}).length > 0 && (
+          <div className="prod-attrs">
+            {Object.entries(p.attributes).slice(0, 3).map(([k, v]) => (
+              <span key={k} className="prod-attr">{String(v).slice(0, 28)}</span>
+            ))}
+          </div>
         )}
       </div>
     </Link>
