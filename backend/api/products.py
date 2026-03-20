@@ -1,28 +1,21 @@
-"""Products API — Integer IDs, accepts both int and slug for section."""
-
-import logging
-from typing import Optional, Union
+"""Products API — no image blobs, PDF deep links instead."""
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
 from core.database import get_db
-from models.models import Product, ProductImage, Document, Section
+from models.models import Product, Document, Section
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _resolve_section_id(section_ref: str, db: AsyncSession) -> Optional[int]:
-    """Accept integer ID or slug string."""
+async def _resolve_section(ref: str, db: AsyncSession) -> Optional[int]:
     try:
-        return int(section_ref)
+        return int(ref)
     except ValueError:
-        # It's a slug — look it up
-        r = await db.execute(select(Section).where(Section.slug == section_ref))
-        sec = r.scalar_one_or_none()
-        return sec.id if sec else None
+        r = await db.execute(select(Section).where(Section.slug == ref))
+        s = r.scalar_one_or_none()
+        return s.id if s else None
 
 
 @router.get("/")
@@ -34,96 +27,62 @@ async def list_products(
     page_size:   int = Query(24, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    q = select(Product).options(selectinload(Product.images))
+    q = select(Product)
     if document_id:
         q = q.where(Product.document_id == document_id)
     if section_id:
         q = q.where(Product.section_id == section_id)
     if search:
         t = f"%{search}%"
-        q = q.where(or_(
-            Product.title.ilike(t),
-            Product.sku.ilike(t),
-            Product.description.ilike(t),
-        ))
-    total_r = await db.execute(select(func.count()).select_from(q.subquery()))
-    total   = total_r.scalar_one() or 0
-    rows_r  = await db.execute(
-        q.order_by(desc(Product.created_at))
-        .offset((page - 1) * page_size).limit(page_size)
-    )
-    rows = rows_r.scalars().all()
-    return {"total": total, "page": page, "page_size": page_size,
-            "items": [_prod(p) for p in rows]}
+        q = q.where(or_(Product.title.ilike(t), Product.sku.ilike(t), Product.description.ilike(t)))
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar_one() or 0
+    rows  = (await db.execute(q.order_by(desc(Product.created_at)).offset((page-1)*page_size).limit(page_size))).scalars().all()
+    return {"total": total, "page": page, "page_size": page_size, "items": [_prod(p) for p in rows]}
 
 
 @router.get("/section/{section_ref}")
-async def products_by_section(
-    section_ref: str,           # accepts "42" (int) or "shlangy" (slug)
+async def by_section(
+    section_ref: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    sid = await _resolve_section_id(section_ref, db)
+    sid = await _resolve_section(section_ref, db)
     if sid is None:
-        raise HTTPException(404, f"Розділ '{section_ref}' не знайдено")
-    q = select(Product).options(selectinload(Product.images)).where(
-        Product.section_id == sid
-    )
-    total_r = await db.execute(select(func.count()).select_from(q.subquery()))
-    total = total_r.scalar_one() or 0
-    rows_r = await db.execute(
-        q.order_by(Product.title).offset((page - 1) * page_size).limit(page_size)
-    )
-    rows = rows_r.scalars().all()
-    return {"total": total, "page": page, "page_size": page_size,
-            "items": [_prod(p) for p in rows]}
+        raise HTTPException(404, f"Section '{section_ref}' not found")
+    q = select(Product).where(Product.section_id == sid)
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar_one() or 0
+    rows  = (await db.execute(q.order_by(Product.title).offset((page-1)*page_size).limit(page_size))).scalars().all()
+    return {"total": total, "page": page, "page_size": page_size, "items": [_prod(p) for p in rows]}
 
 
 @router.get("/{prod_id}/recommendations")
 async def recommendations(prod_id: int, db: AsyncSession = Depends(get_db)):
     p = await db.get(Product, prod_id)
     if not p:
-        raise HTTPException(404, "Товар не знайдено")
+        raise HTTPException(404, "Not found")
     r = await db.execute(
-        select(Product)
-        .options(selectinload(Product.images))
-        .where(Product.section_id == p.section_id, Product.id != prod_id)
-        .limit(6)
+        select(Product).where(Product.section_id == p.section_id, Product.id != prod_id).limit(6)
     )
-    recs = r.scalars().all()
-    return {"recommendations": [
-        {**_prod(x), "reason": "Схожий товар з того ж розділу"}
-        for x in recs
-    ]}
+    return {"recommendations": [{**_prod(x), "reason": "Схожий товар"} for x in r.scalars().all()]}
 
 
 @router.get("/{prod_id}")
 async def get_product(prod_id: int, db: AsyncSession = Depends(get_db)):
-    r = await db.execute(
-        select(Product).where(Product.id == prod_id)
-        .options(selectinload(Product.images))
-    )
-    p = r.scalar_one_or_none()
+    p = await db.get(Product, prod_id)
     if not p:
-        raise HTTPException(404, "Товар не знайдено")
-
-    # Fetch document for deep PDF link
+        raise HTTPException(404, "Not found")
     doc = await db.get(Document, p.document_id)
-    doc_url = None
+    result = _prod(p, detail=True)
     if doc:
         base = doc.file_url or ""
-        doc_url = f"{base}#page={p.page_number}" if p.page_number else base
-
-    result = _prod(p, detail=True)
-    result["document_url"] = doc_url
+        result["document_url"] = f"{base}#page={p.page_number}" if p.page_number else base
+        result["original_url"] = doc.file_url
     return result
 
 
 def _prod(p: Product, detail=False):
-    imgs = p.images if hasattr(p, "images") and p.images else []
-    primary = next((i for i in imgs if i.is_primary), imgs[0] if imgs else None)
-    d: dict = {
+    d = {
         "id": p.id,
         "document_id": p.document_id,
         "section_id": p.section_id,
@@ -132,16 +91,8 @@ def _prod(p: Product, detail=False):
         "description": p.description,
         "attributes": p.attributes or {},
         "page_number": p.page_number,
-        "bbox": p.bbox,
-        "primary_image": primary.image_data if primary else None,
+        "primary_image": None,   # no DB images — frontend shows PDF viewer
         "document_url": None,
         "created_at": p.created_at.isoformat() if p.created_at else None,
     }
-    if detail:
-        d["images"] = [
-            {"id": i.id, "data": i.image_data, "page": i.page_number,
-             "bbox": i.bbox, "width": i.width, "height": i.height,
-             "is_primary": i.is_primary}
-            for i in imgs
-        ]
     return d

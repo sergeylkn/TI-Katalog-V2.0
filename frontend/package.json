@@ -1,6 +1,6 @@
 {
   "name": "ti-katalog-frontend",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -16,7 +16,6 @@
     "clsx": "^2.1.1",
     "debounce": "^2.1.1",
     "lucide-react": "^0.454.0",
-    "react-hot-toast": "^2.4.1",
     "pdfjs-dist": "^4.7.76"
   },
   "devDependencies": {

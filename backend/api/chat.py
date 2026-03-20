@@ -1,61 +1,39 @@
 """AI Chat API."""
-
-import os
 import logging
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+import os
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from core.database import get_db
-from models.models import Product
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-
-class Msg(BaseModel):
-    role: str
-    content: str
-
-
-class ChatIn(BaseModel):
-    messages: List[Msg]
+SYSTEM = """Ти — AI-асистент промислового каталогу TI-Katalog. 
+Допомагаєш знайти гідравлічні компоненти, манометри, шланги, фітинги, насоси, ущільнення.
+Відповідай коротко і по суті українською мовою. Якщо запитують конкретний товар — рекомендуй пошук."""
 
 
-@router.post("")
+class ChatRequest(BaseModel):
+    message: str
+    history: list = []
+
+
 @router.post("/")
-async def chat(body: ChatIn, db: AsyncSession = Depends(get_db)):
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        return {"reply": "⚠️ ANTHROPIC_API_KEY не налаштовано. Перейдіть в адмін-панель."}
-
-    # Get light catalog context
-    r = await db.execute(select(Product).limit(25))
-    products = r.scalars().all()
-    ctx = "\n".join(f"- {p.title} (SKU: {p.sku or 'N/A'})" for p in products[:20])
-
-    import httpx, json
-    system = (
-        "Ти — інтелектуальний помічник техпідтримки TI-Katalog. "
-        "Спеціалізація: промислове обладнання (шланги, фітинги, насоси, манометри, ущільнення, арматура). "
-        "Відповідай ТІЛЬКИ УКРАЇНСЬКОЮ мовою. Будь точним у технічних параметрах (DN, PN, матеріал).\n"
-        f"{'Доступні товари:\n' + ctx if ctx else ''}"
-    )
-    messages = [{"role": m.role, "content": m.content} for m in body.messages]
-
+async def chat(req: ChatRequest):
+    key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not key:
+        raise HTTPException(503, "API key not configured")
     try:
+        import httpx
+        messages = req.history[-6:] + [{"role": "user", "content": req.message}]
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.post(
                 "https://api.anthropic.com/v1/messages",
-                json={"model": "claude-opus-4-5", "max_tokens": 1024,
-                      "system": system, "messages": messages},
-                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                         "content-type": "application/json"},
+                headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 400,
+                      "system": SYSTEM, "messages": messages},
             )
             r.raise_for_status()
-        return {"reply": r.json()["content"][0]["text"]}
+        reply = r.json()["content"][0]["text"]
+        return {"reply": reply}
     except Exception as e:
-        logger.error(f"Chat error: {e}")
-        return {"reply": f"Помилка AI: {str(e)[:200]}"}
+        raise HTTPException(500, str(e))

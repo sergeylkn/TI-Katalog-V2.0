@@ -1,36 +1,13 @@
-"""Async PostgreSQL database — Railway-ready."""
-
+"""Async SQLAlchemy engine — asyncpg driver."""
 import os
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
-_raw = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/tikatalog"
-)
-# Railway gives postgresql:// — upgrade to asyncpg driver
-DATABASE_URL = _raw.replace("postgresql://", "postgresql+asyncpg://", 1)
+_url = os.environ["DATABASE_URL"].replace("postgresql://", "postgresql+asyncpg://").replace("postgres://", "postgresql+asyncpg://")
 
-engine = create_async_engine(
-    DATABASE_URL,
-    pool_size=5,
-    max_overflow=10,
-    pool_pre_ping=True,
-    echo=False,
-)
-
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autoflush=False,
-)
+engine = create_async_engine(_url, pool_size=3, max_overflow=2, pool_pre_ping=True, echo=False)
+AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def get_db():
     async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
+        yield session

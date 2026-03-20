@@ -1,168 +1,111 @@
-"""Admin API — API key (stored in DB) · import · logs · cache."""
-
+"""Admin API — import, status, logs, cache, clear."""
+import asyncio
 import logging
 import os
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from pydantic import BaseModel
-from sqlalchemy import select, func, desc, text
+from fastapi import APIRouter, Depends, BackgroundTasks
+from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from core.database import get_db
-from models.models import Document, ImportLog, ParseLog, Section
+from models.models import Document, Product, Section, ImportLog, ParseLog
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# We store ANTHROPIC_API_KEY in a simple settings table.
-# If the env var is set, it takes priority over DB.
-_KEY_STORE: dict = {}   # in-memory fallback
-
-
-def _get_key_from_env() -> Optional[str]:
-    return os.getenv("ANTHROPIC_API_KEY")
-
-
-# ── API Key ───────────────────────────────────────────────────────────────────
-
-class ApiKeyIn(BaseModel):
-    api_key: str
+_import_running = False
+_api_key_store: dict = {}
 
 
 @router.post("/set-api-key")
-async def set_api_key(body: ApiKeyIn):
-    if not body.api_key.strip().startswith("sk-"):
-        raise HTTPException(400, "Невірний формат ключа (має починатись з sk-)")
-    _KEY_STORE["ANTHROPIC_API_KEY"] = body.api_key.strip()
-    # Also set env so services pick it up immediately
-    os.environ["ANTHROPIC_API_KEY"] = body.api_key.strip()
-    return {"status": "ok", "message": "API ключ збережено ✓"}
+async def set_api_key(payload: dict):
+    key = payload.get("api_key", "").strip()
+    os.environ["ANTHROPIC_API_KEY"] = key
+    _api_key_store["key"] = key
+    return {"status": "saved"}
 
 
 @router.get("/get-api-key")
 async def get_api_key():
-    key = _get_key_from_env() or _KEY_STORE.get("ANTHROPIC_API_KEY")
-    if not key:
-        return {"configured": False, "masked": None}
-    return {"configured": True, "masked": key[:10] + "****" + key[-4:]}
+    key = os.getenv("ANTHROPIC_API_KEY", "")
+    return {"has_key": bool(key), "preview": f"{key[:8]}…" if key else ""}
 
-
-# ── Import ────────────────────────────────────────────────────────────────────
 
 @router.post("/import-all-pdfs")
-async def import_all(bg: BackgroundTasks, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(func.count()).select_from(Document).where(Document.status == "parsing")
-    )
-    running = result.scalar_one()
-    if running > 0:
-        return {"status": "already_running", "message": f"{running} файлів обробляється"}
-    from services.importer import run_import_all
-    bg.add_task(run_import_all)
-    return {"status": "started", "message": "Імпорт запущено у фоні"}
+async def import_all(bg: BackgroundTasks):
+    global _import_running
+    if _import_running:
+        return {"status": "already_running"}
+    _import_running = True
+    async def _run():
+        global _import_running
+        try:
+            from services.importer import run_import_all
+            await run_import_all()
+        finally:
+            _import_running = False
+    bg.add_task(_run)
+    return {"status": "started"}
 
 
 @router.get("/import-status")
 async def import_status(db: AsyncSession = Depends(get_db)):
-    async def count(cond=None):
-        q = select(func.count()).select_from(Document)
-        if cond is not None:
-            q = q.where(cond)
-        r = await db.execute(q)
-        return r.scalar_one() or 0
-
-    total   = await count()
-    done    = await count(Document.status == "done")
-    parsing = await count(Document.status == "parsing")
-    errors  = await count(Document.status == "error")
-    pending = await count(Document.status == "pending")
-    return {
-        "total": total, "done": done, "parsing": parsing,
-        "errors": errors, "pending": pending,
-        "is_importing": parsing > 0,
-    }
+    total = (await db.execute(select(func.count()).select_from(Document))).scalar_one()
+    done  = (await db.execute(select(func.count()).select_from(Document).where(Document.status == "done"))).scalar_one()
+    err   = (await db.execute(select(func.count()).select_from(Document).where(Document.status == "error"))).scalar_one()
+    pars  = (await db.execute(select(func.count()).select_from(Document).where(Document.status == "parsing"))).scalar_one()
+    prods = (await db.execute(select(func.count()).select_from(Product))).scalar_one()
+    return {"total": total, "done": done, "error": err, "parsing": pars,
+            "products": prods, "running": _import_running}
 
 
 @router.get("/import-logs")
 async def import_logs(limit: int = 100, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(ImportLog).order_by(desc(ImportLog.created_at)).limit(limit)
-    )
-    rows = result.scalars().all()
-    return [
-        {
-            "id": r.id,
-            "document_name": r.document_name,
-            "filename": r.document_name,
-            "status": r.status,
-            "message": r.message,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-        }
-        for r in rows
-    ]
+    r = await db.execute(select(ImportLog).order_by(ImportLog.created_at.desc()).limit(limit))
+    logs = r.scalars().all()
+    return {"logs": [{"id": l.id, "doc": l.document_name, "status": l.status,
+                      "msg": l.message, "at": l.created_at.isoformat()} for l in logs]}
 
 
 @router.get("/parse-logs")
 async def parse_logs(limit: int = 100, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(ParseLog).order_by(desc(ParseLog.created_at)).limit(limit)
-    )
-    rows = result.scalars().all()
-    return [
-        {
-            "id": r.id,
-            "document_id": r.document_id,
-            "level": r.level,
-            "message": r.message,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-        }
-        for r in rows
-    ]
+    r = await db.execute(select(ParseLog).order_by(ParseLog.created_at.desc()).limit(limit))
+    logs = r.scalars().all()
+    return {"logs": [{"id": l.id, "doc_id": l.document_id, "level": l.level,
+                      "msg": l.message, "at": l.created_at.isoformat()} for l in logs]}
 
-
-@router.get("/cache-stats")
-async def cache_stats():
-    from services.cache import cache_stats as _stats
-    return await _stats()
-
-
-@router.post("/clear-cache")
-async def clear_cache():
-    from services.cache import cache_clear
-    n = await cache_clear()
-    return {"status": "ok", "cleared": n}
-
-
-# ── Reparse ───────────────────────────────────────────────────────────────────
 
 @router.post("/reparse/{doc_id}")
 async def reparse(doc_id: int, bg: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     doc = await db.get(Document, doc_id)
     if not doc:
-        raise HTTPException(404, "Документ не знайдено")
+        from fastapi import HTTPException
+        raise HTTPException(404, "Document not found")
     doc.status = "pending"
     await db.commit()
-    from services.importer import parse_one
-    bg.add_task(parse_one, doc_id)
-    return {"status": "queued"}
+    async def _run():
+        from services.importer import parse_one
+        await parse_one(doc_id)
+    bg.add_task(_run)
+    return {"status": "queued", "doc_id": doc_id}
 
 
 @router.delete("/document/{doc_id}")
-async def delete_doc(doc_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_document(doc_id: int, db: AsyncSession = Depends(get_db)):
     doc = await db.get(Document, doc_id)
-    if not doc:
-        raise HTTPException(404, "Документ не знайдено")
-    await db.delete(doc)
-    await db.commit()
-    return {"status": "deleted"}
+    if doc:
+        await db.delete(doc)
+        await db.commit()
+    return {"deleted": doc_id}
 
 
 @router.post("/clear-database")
 async def clear_database(db: AsyncSession = Depends(get_db)):
-    """Wipe all data for re-import. TRUNCATE is atomic and fast."""
     await db.execute(text(
-        "TRUNCATE TABLE parse_logs, import_logs, product_images, "
-        "text_chunks, products, documents RESTART IDENTITY CASCADE"
+        "TRUNCATE TABLE parse_logs, import_logs, products, documents RESTART IDENTITY CASCADE"
     ))
     await db.commit()
     return {"status": "cleared"}
+
+
+@router.get("/cache-stats")
+async def cache_stats():
+    return {"cache": "disabled", "note": "lightweight mode"}
