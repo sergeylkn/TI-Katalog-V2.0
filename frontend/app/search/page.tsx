@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
@@ -14,6 +14,8 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiSummary, setAiSummary] = useState('')
   const [vectorUsed, setVectorUsed] = useState(false)
   const [paramsDetected, setParamsDetected] = useState<any>({})
   const [inputQ, setInputQ] = useState(q)
@@ -24,13 +26,25 @@ export default function SearchPage() {
     setInputQ(q)
     if (!q) return
     setLoading(true)
+    setAiSummary('')
     setPage(1)
+
+    // 1. Hybrid Search
     api.search(q, 1, PAGE_SIZE)
       .then(r => {
         setResults(r.items)
         setTotal(r.total)
         setVectorUsed(r.vector_used)
         setParamsDetected(r.params_detected || {})
+
+        // 2. AI Summary (only if results exist)
+        if (r.items.length > 0) {
+          setAiLoading(true)
+          api.searchAiSummary(q)
+            .then(res => setAiSummary(res.summary))
+            .catch(err => console.error('AI Summary error:', err))
+            .finally(() => setAiLoading(false))
+        }
       })
       .catch(() => setResults([]))
       .finally(() => setLoading(false))
@@ -86,6 +100,37 @@ export default function SearchPage() {
                 Виявлено: {Object.entries(paramsDetected).map(([k, v]) => `${k}=${v}`).join(', ')}
               </span>
             )}
+          </div>
+        )}
+
+        {/* AI Insight Section */}
+        {aiSummary && (
+          <div style={{
+            background: 'linear-gradient(135deg, #fdf2f2 0%, #fff 100%)',
+            border: '1px solid #fee2e2',
+            borderRadius: 'var(--radius2)',
+            padding: '20px',
+            marginBottom: '32px',
+            boxShadow: '0 4px 12px rgba(196, 30, 30, 0.05)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '18px' }}>✨</span>
+              <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#9e000c', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                AI Аналіз результатів
+              </h3>
+            </div>
+            <p style={{ fontSize: '15px', color: 'var(--text)', lineHeight: '1.6', margin: 0 }}>
+              {aiSummary}
+            </p>
+          </div>
+        )}
+
+        {aiLoading && !aiSummary && (
+          <div style={{ marginBottom: '32px', padding: '20px', background: 'var(--bg2)', borderRadius: 'var(--radius2)', opacity: 0.6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="spinner" style={{ width: '16px', height: '16px' }} />
+              <span style={{ fontSize: '14px', color: 'var(--text2)' }}>AI аналізує технічні параметри...</span>
+            </div>
           </div>
         )}
 

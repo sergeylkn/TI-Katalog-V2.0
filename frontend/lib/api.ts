@@ -61,6 +61,7 @@ export const api = {
       `/api/search/?${params}`
     )
   },
+  searchAiSummary: (q: string) => req<{ summary: string; confidence: number; matches: any[] }>(`/api/ai-search/summary?q=${encodeURIComponent(q)}`),
   suggest: (q: string) => req<{ suggestions: { id: number; title: string; sku: string }[] }>(
     `/api/search/suggest?q=${encodeURIComponent(q)}`
   ),

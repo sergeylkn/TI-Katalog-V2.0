@@ -1,8 +1,3 @@
-"""
-Claude service stub — Setting model removed.
-API key is read from os.environ directly.
-All AI calls use inline httpx in api/search.py and api/chat.py.
-"""
 import os
 import json
 import logging
@@ -11,23 +6,25 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 _API = "https://api.anthropic.com/v1/messages"
-_MODEL = "claude-opus-4-5"
+_MODEL = "claude-3-5-sonnet-20240620"
 
 
 async def ai_search(query: str, catalog: List[Dict], db=None) -> Dict:
-    """Claude AI semantic search — called by old api/search.py if present."""
+    """Claude AI semantic search and analysis."""
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         return {"matches": [], "summary": "ANTHROPIC_API_KEY not set", "confidence": 0}
 
     system = (
-        "Ти — AI-асистент технічного каталогу. "
-        "Відповідай ТІЛЬКИ валідним JSON без пояснень. "
+        "Ти — AI-асистент технічного каталогу Tubes International. "
+        "Твоє завдання — проаналізувати результати пошуку та дати коротке резюме користувачеві. "
+        "Зверни увагу на технічні характеристики (тиск, діаметр, матеріал). "
+        "Відповідай ТІЛЬКИ валідним JSON без додаткових пояснень. "
         'Структура: {"matches":[{"id":1,"relevance":0.9,"reason":"..."}],'
-        '"summary":"...","confidence":0.9} '
-        "Максимум 10 результатів."
+        '"summary":"Короткий технічний огляд результатів","confidence":0.9} '
+        "Мова відповіді: українська."
     )
-    user = f'Запит: "{query}"\n\nКаталог:\n{json.dumps(catalog[:80], ensure_ascii=False)}\n\nЗнайди релевантні товари.'
+    user = f'Запит користувача: "{query}"\n\nЗнайдені товари в каталозі:\n{json.dumps(catalog[:15], ensure_ascii=False)}\n\nПроаналізуй та надай резюме.'
 
     try:
         async with httpx.AsyncClient(timeout=25) as c:
@@ -44,10 +41,17 @@ async def ai_search(query: str, catalog: List[Dict], db=None) -> Dict:
         raw = r.json()["content"][0]["text"].strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+
+        # Simple JSON extraction in case there is some junk
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start != -1 and end != 0:
+            raw = raw[start:end]
+
         return json.loads(raw)
     except Exception as e:
         logger.error(f"ai_search error: {e}")
-        return {"matches": [], "summary": str(e)[:100], "confidence": 0}
+        return {"matches": [], "summary": f"Помилка аналізу: {str(e)[:100]}", "confidence": 0}
 
 
 async def chat_response(messages: List[Dict], catalog_context: str = "", db=None) -> str:
