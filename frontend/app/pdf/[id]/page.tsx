@@ -3,7 +3,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, ExternalLink } from 'lucide-react'
-import { apiService, Document } from '@/lib/api'
+import { api, Document } from '@/lib/api'
 
 function PDFContent({ docId }: { docId: number }) {
   const sp = useSearchParams()
@@ -18,7 +18,7 @@ function PDFContent({ docId }: { docId: number }) {
   const taskRef = useRef<unknown>(null)
 
   useEffect(() => {
-    apiService.getDocument(docId).then(d => { setDoc(d); setTotalPages(d.page_count || 0) }).catch(() => {})
+    api.getDocument(docId).then(d => { setDoc(d); setTotalPages(d.page_count || 0) }).catch(() => {})
   }, [docId])
 
   useEffect(() => {

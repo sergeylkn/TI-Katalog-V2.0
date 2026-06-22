@@ -50,6 +50,7 @@ export const api = {
     ),
   getProduct:      (id: number) => req<Product>(`/api/products/${id}`),
   recommendations: (id: number) => req<{ recommendations: Product[] }>(`/api/products/${id}/recommendations`),
+  getDocument: (id: number) => req<Document>(`/api/documents/${id}`),
   imageUrl:        (id: number) => `${API}/api/products/${id}/image`,
 
   // Search
@@ -81,4 +82,10 @@ export const api = {
   importLogs:   (n = 50) => req<any>(`/api/admin/import-logs?limit=${n}`),
   parseLogs:    (n = 50) => req<any>(`/api/admin/parse-logs?limit=${n}`),
   clearDatabase: () => req<any>('/api/admin/clear-database', { method: 'POST' }),
+}
+
+export interface Document {
+  id: number; name: string; file_url: string
+  status: string; page_count: number | null
+  error_msg: string | null; parsed_at: string | null
 }
