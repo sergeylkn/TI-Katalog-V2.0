@@ -65,13 +65,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from api import admin, documents, products, search, chat
+from api import admin, documents, products, search, chat, ai_search
 
 app.include_router(admin.router,     prefix="/api/admin")
 app.include_router(documents.router, prefix="/api/documents")
 app.include_router(products.router,  prefix="/api/products")
 app.include_router(search.router,    prefix="/api/search")
 app.include_router(chat.router,      prefix="/api/chat")
+app.include_router(ai_search.router,   prefix="/api/ai-search")
 
 
 @app.get("/health")
