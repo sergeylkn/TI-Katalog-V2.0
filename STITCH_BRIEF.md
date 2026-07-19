@@ -277,3 +277,19 @@ Onboarding → Home (+ recovery-статус, streak) → Weekly Plan → Catalo
 Exercise Detail (гиря / без снаряда, реалистичная анатомия, вес 16/24/32) →
 Workout Player → Workout Complete (мышцы за сегодня, объём, PR) →
 Progress & Recovery → Profile/Settings
+
+## 12. Итог генерации v2 в Stitch (выполнено)
+
+Проект: «Kettle&Body — Workout App» (projects/9585393023482311569)
+
+**Вариант A — Volt Impact (10 экранов):** Kettle&Body Onboarding · Volt Impact
+Home · Weekly Plan · Exercise Catalog · Kettlebell Swing (реалистичная анатомия,
+вес 16/24/32) · Push-ups Exercise Detail · Workout Player · Workout Summary ·
+Progress & Recovery (карта восстановления мышц) · Profile & Settings
+
+**Вариант B — Arctic Pulse (4 ключевых экрана):** Arctic Pulse Home ·
+Kettlebell Swing — Arctic Pulse · Workout Player · Exercises Catalog
+
+Мышцы во всех детальных экранах — écorché-иллюстрации (перед+спина) с
+градацией Primary / Secondary / Stabilizer; в A — лайм→изумруд, в B —
+тепловая карта красным.
