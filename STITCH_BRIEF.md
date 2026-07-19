@@ -287,8 +287,10 @@ Home · Weekly Plan · Exercise Catalog · Kettlebell Swing (реалистич�
 вес 16/24/32) · Push-ups Exercise Detail · Workout Player · Workout Summary ·
 Progress & Recovery (карта восстановления мышц) · Profile & Settings
 
-**Вариант B — Arctic Pulse (4 ключевых экрана):** Arctic Pulse Home ·
-Kettlebell Swing — Arctic Pulse · Workout Player · Exercises Catalog
+**Вариант B — Arctic Pulse (10 экранов, полный):** Kettle&Body Onboarding —
+Arctic Pulse · Arctic Pulse Home · Weekly Plan · Exercises Catalog ·
+Kettlebell Swing · Push-ups — Arctic Cyan · Workout Player · Workout Summary ·
+Progress & Recovery · Profile & Settings
 
 Мышцы во всех детальных экранах — écorché-иллюстрации (перед+спина) с
 градацией Primary / Secondary / Stabilizer; в A — лайм→изумруд, в B —
