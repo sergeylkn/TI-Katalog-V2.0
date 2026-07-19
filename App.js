@@ -140,18 +140,21 @@ const SCHEDULE = {
 };
 
 // ============================================================================
-// ЦВЕТА (тёмная тема)
+// ЦВЕТА — дизайн-система «Volt Impact» (вариант A из Stitch)
+// Тёмная тема: глубокий чёрный фон, электрик-лайм как основной акцент,
+// изумруд для подготовки/успеха, холодный серо-голубой для отдыха.
 // ============================================================================
 const COLORS = {
-  bg: "#0E0F13",
-  card: "#181A20",
-  cardAlt: "#20232B",
-  accent: "#FF6B35",
-  accentRest: "#3DA9FC",
+  bg: "#0A0B0E",
+  card: "#15171C",
+  cardAlt: "#1E2128",
+  accent: "#C6FF00",
+  accentRest: "#7A8CA3",
   accentPrep: "#4CD964",
   text: "#FFFFFF",
   textDim: "#9AA0AC",
-  border: "#2A2E38",
+  border: "rgba(255,255,255,0.08)",
+  onAccent: "#0A0B0E",
 };
 
 // ============================================================================
@@ -518,7 +521,9 @@ function WorkoutScreen({ workoutKey, onExit }) {
             onPress={handleStart}
             activeOpacity={0.85}
           >
-            <Text style={styles.ctrlBtnText}>▶  Старт</Text>
+            <Text style={[styles.ctrlBtnText, { color: COLORS.onAccent }]}>
+              ▶  Старт
+            </Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -610,7 +615,7 @@ const styles = StyleSheet.create({
     marginRight: 14,
   },
   previewIndexText: {
-    color: "#fff",
+    color: COLORS.onAccent,
     fontWeight: "800",
     fontSize: 16,
   },
@@ -633,7 +638,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   startBtnText: {
-    color: "#fff",
+    color: COLORS.onAccent,
     fontSize: 20,
     fontWeight: "800",
   },
@@ -754,7 +759,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   exitBtnText: {
-    color: "#fff",
+    color: COLORS.onAccent,
     fontSize: 18,
     fontWeight: "800",
   },
