@@ -1,0 +1,603 @@
+<title>Kettle&Body — макеты экранов</title>
+<style>
+  /* ============ Оболочка галереи ============ */
+  :root{
+    --pg-bg:#101114; --pg-txt:#E8E9EC; --pg-dim:#8A8F9A;
+    --pg-line:rgba(255,255,255,.08); --pg-card:#16181d;
+  }
+  html{scroll-behavior:smooth}
+  body{background:var(--pg-bg);color:var(--pg-txt);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    margin:0;padding:0 20px 80px;}
+  .wrap{max-width:1360px;margin:0 auto}
+  header.gal{padding:48px 0 8px}
+  .gal h1{font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-.03em;margin:0 0 10px;text-wrap:balance}
+  .gal p{color:var(--pg-dim);max-width:62ch;line-height:1.55;margin:0 0 22px}
+  .jump{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .jump a{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--pg-line);
+    border-radius:999px;padding:8px 16px;color:var(--pg-txt);text-decoration:none;font-size:14px;font-weight:600}
+  .jump a:hover,.jump a:focus-visible{border-color:var(--pg-dim);outline:none}
+  .dotA,.dotB{width:10px;height:10px;border-radius:50%}
+  .dotA{background:#C6FF00}.dotB{background:#22D3EE}
+  section.varsec{margin-top:44px}
+  .sechead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-top:1px solid var(--pg-line);padding-top:26px}
+  .sechead h2{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:0}
+  .sechead .pal{display:flex;gap:6px;align-items:center}
+  .pal i{display:block;width:18px;height:18px;border-radius:5px;border:1px solid rgba(255,255,255,.15)}
+  .sechead .note{color:var(--pg-dim);font-size:13px}
+  .grid{display:flex;flex-wrap:wrap;gap:34px;justify-content:flex-start;margin-top:26px}
+  figure.shot{margin:0;display:flex;flex-direction:column;gap:10px}
+  figure.shot figcaption{font-size:13px;color:var(--pg-dim);font-weight:600;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+
+  /* ============ Палитры вариантов ============ */
+  .va{ --bg:#0A0B0E; --sur:#15171C; --elev:#1E2128; --pri:#C6FF00; --onpri:#0A0B0E;
+       --sec:#4CD964; --rest:#7A8CA3; --txt:#FFFFFF; --dim:#9AA0AC;
+       --line:rgba(255,255,255,.08);
+       --m1:#C6FF00; --m2:#4CD964; --m3:#31572e; --m-off:#2A2E36; --sil:#1c1f26; }
+  .vb{ --bg:#0B0F17; --sur:#141A26; --elev:#1C2433; --pri:#22D3EE; --onpri:#06131a;
+       --sec:#8B5CF6; --rest:#8B5CF6; --txt:#FFFFFF; --dim:#94A3B8;
+       --line:rgba(255,255,255,.09);
+       --m1:#F43F5E; --m2:#fb7185; --m3:#57323a; --m-off:#273041; --sil:#1a2130; }
+
+  /* ============ Телефон ============ */
+  .ph{width:390px;background:var(--bg);border:1px solid var(--pg-line);border-radius:34px;
+    overflow:hidden;color:var(--txt);flex-shrink:0;display:flex;flex-direction:column}
+  .stat{display:flex;justify-content:space-between;align-items:center;padding:12px 24px 4px;
+    font-size:12px;font-weight:700;color:var(--dim)}
+  .scr{padding:10px 20px 0;display:flex;flex-direction:column;gap:14px;flex:1}
+  .lbl{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .t-xl{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.1;margin:0}
+  .t-lg{font-size:22px;font-weight:800;letter-spacing:-.01em;margin:0}
+  .t-md{font-size:16px;font-weight:700;margin:0}
+  .sub{color:var(--dim);font-size:14px;line-height:1.45;margin:0}
+  .card{background:var(--sur);border:1px solid var(--line);border-radius:20px;padding:16px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .btn{border-radius:16px;padding:15px 18px;text-align:center;font-weight:800;font-size:16px;border:1px solid transparent}
+  .btn-pri{background:var(--pri);color:var(--onpri)}
+  .btn-ghost{border-color:var(--line);color:var(--txt);background:transparent}
+  .chip{display:inline-block;background:var(--elev);border:1px solid var(--line);
+    color:var(--txt);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600}
+  .chip.on{background:var(--pri);color:var(--onpri);border-color:transparent}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .badge{display:inline-block;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800;
+    letter-spacing:.03em;background:var(--elev);color:var(--dim)}
+  .badge.pri{background:color-mix(in srgb,var(--pri) 18%,transparent);color:var(--pri)}
+  .badge.sec{background:color-mix(in srgb,var(--sec) 18%,transparent);color:var(--sec)}
+  .seg{display:flex;background:var(--elev);border-radius:14px;padding:4px;gap:4px}
+  .seg span{flex:1;text-align:center;padding:9px 0;border-radius:11px;font-size:14px;font-weight:700;color:var(--dim)}
+  .seg span.on{background:var(--pri);color:var(--onpri)}
+  .media{background:linear-gradient(160deg,var(--elev),var(--sur));border:1px solid var(--line);
+    border-radius:20px;height:170px;display:flex;align-items:center;justify-content:center;position:relative}
+  .media .play{width:54px;height:54px;border-radius:50%;background:color-mix(in srgb,var(--pri) 90%,#fff 0%);
+    color:var(--onpri);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900}
+  .media .tag{position:absolute;left:12px;top:12px}
+  .tabs{display:flex;border-top:1px solid var(--line);margin-top:auto;background:var(--sur)}
+  .tabs div{flex:1;text-align:center;padding:12px 0 16px;font-size:11px;font-weight:700;color:var(--dim)}
+  .tabs div.on{color:var(--pri)}
+  .tabs i{display:block;font-style:normal;font-size:17px;margin-bottom:2px}
+  .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .kpi .card{padding:12px;text-align:center}
+  .kpi b{font-size:20px;font-weight:800;display:block;font-variant-numeric:tabular-nums}
+  .kpi span{font-size:11px;color:var(--dim);font-weight:600}
+  .list{display:flex;flex-direction:column;gap:10px}
+  .steps{display:flex;flex-direction:column;gap:12px;counter-reset:st}
+  .steps p{margin:0;padding-left:34px;position:relative;font-size:13.5px;line-height:1.45;color:var(--txt)}
+  .steps p::before{counter-increment:st;content:counter(st);position:absolute;left:0;top:0;
+    width:22px;height:22px;border-radius:50%;background:var(--elev);color:var(--pri);
+    font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .steps b{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+  .bar{height:6px;border-radius:3px;background:var(--elev);overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--pri)}
+  .timer{font-size:76px;font-weight:900;letter-spacing:-.03em;text-align:center;
+    font-variant-numeric:tabular-nums;color:var(--pri);margin:0;line-height:1}
+  .pill{align-self:center;border-radius:999px;padding:6px 18px;font-size:12px;font-weight:900;
+    letter-spacing:.14em;background:color-mix(in srgb,var(--pri) 16%,transparent);color:var(--pri)}
+  .avatar{width:52px;height:52px;border-radius:50%;background:var(--elev);border:2px solid var(--pri);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:var(--pri)}
+  .flame{color:var(--pri);font-weight:800;font-size:13px}
+  .togg{width:44px;height:26px;border-radius:13px;background:var(--pri);position:relative;flex-shrink:0}
+  .togg::after{content:"";position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:50%;background:var(--onpri)}
+  .togg.off{background:var(--elev)}
+  .togg.off::after{left:3px;right:auto;background:var(--dim)}
+  .heat{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .heat i{aspect-ratio:1;border-radius:6px;background:var(--elev)}
+  .heat i.h1{background:color-mix(in srgb,var(--pri) 30%,var(--elev))}
+  .heat i.h2{background:color-mix(in srgb,var(--pri) 60%,var(--elev))}
+  .heat i.h3{background:var(--pri)}
+  .day{display:flex;align-items:center;gap:12px;background:var(--sur);border:1px solid var(--line);
+    border-radius:18px;padding:13px 16px}
+  .day.today{border-color:var(--pri);box-shadow:0 0 0 1px var(--pri)}
+  .day .ic{width:38px;height:38px;border-radius:12px;background:var(--elev);
+    display:flex;align-items:center;justify-content:center;font-size:17px}
+  .day .nm{font-weight:800;font-size:15px}
+  .day .ds{font-size:12px;color:var(--dim)}
+  .mini{display:flex;gap:10px;overflow:hidden}
+  .mini .card{min-width:118px;padding:10px}
+  .ic2{width:44px;height:44px;border-radius:14px;background:var(--elev);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+  .mini .th{height:64px;border-radius:12px;background:var(--elev);margin-bottom:8px;
+    display:flex;align-items:center;justify-content:center;font-size:22px}
+  .mini b{font-size:12.5px;display:block}
+  .mini span{font-size:10.5px;color:var(--dim)}
+
+  /* ============ Карта мышц ============ */
+  .mmwrap{display:flex;gap:14px;align-items:center}
+  .mmsvg{flex-shrink:0}
+  .mmsvg .mus{fill:var(--m-off);transition:fill .2s}
+  .mmsvg .sil{fill:var(--sil)}
+  .legend{display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--dim)}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+  .l1{background:var(--m1)}.l2{background:var(--m2)}.l3{background:var(--m3)}
+  /* Подсветка по упражнению — кастомные свойства пробивают <use> */
+  .mm-swing{--m-glute:var(--m1);--m-ham:var(--m1);--m-erec:var(--m2);--m-lat:var(--m2);--m-abs:var(--m3)}
+  .mm-push{--m-pec:var(--m1);--m-tri:var(--m2);--m-delt:var(--m2);--m-abs:var(--m3)}
+  .mm-upper{--m-delt:var(--m1);--m-pec:var(--m1);--m-lat:var(--m1);--m-bic:var(--m2);--m-tri:var(--m2);--m-abs:var(--m3)}
+  .mm-rec{--m-delt:var(--m1);--m-pec:var(--m1);--m-bic:var(--m1);--m-glute:var(--rest);--m-ham:var(--rest);--m-quad:var(--rest)}
+
+  @media (max-width:440px){ .ph{width:100%} }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+
+<div class="wrap">
+<header class="gal">
+  <h1>Kettle&Body — макеты всех экранов</h1>
+  <p>10 экранов приложения в двух дизайн-системах без оранжевого. Карты мышц —
+     схема «перед + спина» с тремя уровнями вовлечения: основные, вспомогательные,
+     стабилизаторы. Эти макеты повторяют спецификации, по которым генерировались
+     экраны в Stitch, и служат прямой основой для переноса в код.</p>
+  <nav class="jump">
+    <a href="#va"><span class="dotA"></span>Вариант A — Volt Impact</a>
+    <a href="#vb"><span class="dotB"></span>Вариант B — Arctic Pulse</a>
+  </nav>
+</header>
+
+<!-- ================= ВАРИАНТ A ================= -->
+<section class="varsec va" id="va">
+  <div class="sechead">
+    <h2>Вариант A — Volt Impact</h2>
+    <span class="pal">
+      <i style="background:#0A0B0E"></i><i style="background:#15171C"></i>
+      <i style="background:#C6FF00"></i><i style="background:#4CD964"></i><i style="background:#7A8CA3"></i>
+    </span>
+    <span class="note">электрик-лайм · изумрудные мышцы · Space Grotesk-настроение</span>
+  </div>
+  <div class="grid" id="master">
+
+    <!-- SVG-определения фигур (объявляются один раз) -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        <!-- Фигура спереди -->
+        <g id="fig-f">
+          <circle class="sil" cx="45" cy="16" r="12"/>
+          <rect class="sil" x="39" y="26" width="12" height="10" rx="4"/>
+          <path class="sil" d="M18 40 Q45 30 72 40 L74 120 Q45 132 16 120 Z"/>
+          <rect class="sil" x="2"  y="44" width="16" height="70" rx="8"/>
+          <rect class="sil" x="72" y="44" width="16" height="70" rx="8"/>
+          <rect class="sil" x="24" y="128" width="18" height="118" rx="9"/>
+          <rect class="sil" x="48" y="128" width="18" height="118" rx="9"/>
+          <ellipse class="mus" style="fill:var(--m-delt,var(--m-off))" cx="16" cy="48" rx="9" ry="11"/>
+          <ellipse class="mus" style="fill:var(--m-delt,var(--m-off))" cx="74" cy="48" rx="9" ry="11"/>
+          <ellipse class="mus" style="fill:var(--m-pec,var(--m-off))" cx="33" cy="56" rx="12" ry="9"/>
+          <ellipse class="mus" style="fill:var(--m-pec,var(--m-off))" cx="57" cy="56" rx="12" ry="9"/>
+          <ellipse class="mus" style="fill:var(--m-bic,var(--m-off))" cx="10" cy="74" rx="6" ry="12"/>
+          <ellipse class="mus" style="fill:var(--m-bic,var(--m-off))" cx="80" cy="74" rx="6" ry="12"/>
+          <rect class="mus" style="fill:var(--m-abs,var(--m-off))" x="36" y="70" width="18" height="42" rx="8"/>
+          <path class="mus" style="fill:var(--m-obl,var(--m-off))" d="M28 74 L34 72 L34 112 L26 106 Z"/>
+          <path class="mus" style="fill:var(--m-obl,var(--m-off))" d="M62 74 L56 72 L56 112 L64 106 Z"/>
+          <rect class="mus" style="fill:var(--m-quad,var(--m-off))" x="26" y="134" width="14" height="54" rx="7"/>
+          <rect class="mus" style="fill:var(--m-quad,var(--m-off))" x="50" y="134" width="14" height="54" rx="7"/>
+          <rect class="mus" style="fill:var(--m-calf,var(--m-off))" x="27" y="200" width="12" height="34" rx="6"/>
+          <rect class="mus" style="fill:var(--m-calf,var(--m-off))" x="51" y="200" width="12" height="34" rx="6"/>
+        </g>
+        <!-- Фигура сзади -->
+        <g id="fig-b">
+          <circle class="sil" cx="45" cy="16" r="12"/>
+          <path class="sil" d="M18 40 Q45 30 72 40 L74 120 Q45 132 16 120 Z"/>
+          <rect class="sil" x="2"  y="44" width="16" height="70" rx="8"/>
+          <rect class="sil" x="72" y="44" width="16" height="70" rx="8"/>
+          <rect class="sil" x="24" y="128" width="18" height="118" rx="9"/>
+          <rect class="sil" x="48" y="128" width="18" height="118" rx="9"/>
+          <path class="mus" style="fill:var(--m-trap,var(--m-off))" d="M33 34 L45 28 L57 34 L52 58 L38 58 Z"/>
+          <ellipse class="mus" style="fill:var(--m-delt,var(--m-off))" cx="16" cy="48" rx="9" ry="11"/>
+          <ellipse class="mus" style="fill:var(--m-delt,var(--m-off))" cx="74" cy="48" rx="9" ry="11"/>
+          <ellipse class="mus" style="fill:var(--m-tri,var(--m-off))" cx="10" cy="76" rx="6" ry="13"/>
+          <ellipse class="mus" style="fill:var(--m-tri,var(--m-off))" cx="80" cy="76" rx="6" ry="13"/>
+          <path class="mus" style="fill:var(--m-lat,var(--m-off))" d="M26 60 L38 62 L36 96 L24 88 Z"/>
+          <path class="mus" style="fill:var(--m-lat,var(--m-off))" d="M64 60 L52 62 L54 96 L66 88 Z"/>
+          <rect class="mus" style="fill:var(--m-erec,var(--m-off))" x="40" y="62" width="4.5" height="50" rx="2"/>
+          <rect class="mus" style="fill:var(--m-erec,var(--m-off))" x="45.5" y="62" width="4.5" height="50" rx="2"/>
+          <ellipse class="mus" style="fill:var(--m-glute,var(--m-off))" cx="36" cy="124" rx="11" ry="12"/>
+          <ellipse class="mus" style="fill:var(--m-glute,var(--m-off))" cx="54" cy="124" rx="11" ry="12"/>
+          <rect class="mus" style="fill:var(--m-ham,var(--m-off))" x="26" y="140" width="14" height="50" rx="7"/>
+          <rect class="mus" style="fill:var(--m-ham,var(--m-off))" x="50" y="140" width="14" height="50" rx="7"/>
+          <rect class="mus" style="fill:var(--m-calf,var(--m-off))" x="27" y="198" width="12" height="36" rx="6"/>
+          <rect class="mus" style="fill:var(--m-calf,var(--m-off))" x="51" y="198" width="12" height="36" rx="6"/>
+        </g>
+      </defs>
+    </svg>
+
+    <!-- 1. Онбординг -->
+    <figure class="shot"><div class="ph">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="scr">
+        <p class="lbl" style="color:var(--pri)">Kettle&amp;Body</p>
+        <h3 class="t-xl">Тренируйся умно.<br>Видь, как работают мышцы.</h3>
+        <div class="card">
+          <p class="lbl">Твоя цель</p>
+          <div class="chips" style="margin-top:8px">
+            <span class="chip on">Сила</span><span class="chip">Тонус</span><span class="chip">Выносливость</span>
+          </div>
+        </div>
+        <div class="card">
+          <p class="lbl">Твой уровень</p>
+          <div class="chips" style="margin-top:8px">
+            <span class="chip">Новичок</span><span class="chip on">Средний</span><span class="chip">Продвинутый</span>
+          </div>
+        </div>
+        <div class="card">
+          <p class="lbl">Твои гири</p>
+          <div class="chips" style="margin-top:8px">
+            <span class="chip">16 кг</span><span class="chip on">24 кг</span><span class="chip">32 кг</span>
+          </div>
+        </div>
+        <div class="btn btn-pri">Начать тренировки</div>
+        <p class="sub" style="text-align:center;padding-bottom:18px">Пропустить</p>
+      </div>
+    </div><figcaption>01 · onboarding</figcaption></figure>
+
+    <!-- 2. Главный -->
+    <figure class="shot"><div class="ph">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="scr">
+        <div class="row">
+          <div class="grow">
+            <h3 class="t-lg">Привет, Сергей</h3>
+            <p class="sub">Время становиться сильнее</p>
+          </div>
+          <span class="flame">🔥 12 дней</span>
+          <div class="avatar">С</div>
+        </div>
+        <div class="card row">
+          <svg class="mmsvg mm-rec" viewBox="0 0 90 250" width="34" height="94" aria-label="Восстановление мышц"><use href="#fig-f"/></svg>
+          <div class="grow">
+            <p class="t-md">Ноги восстановлены</p>
+            <p class="sub">Верх тела — 70%</p>
+          </div>
+        </div>
+        <div class="card" style="border-color:var(--pri)">
+          <p class="lbl" style="color:var(--pri)">Сегодня · Вторник</p>
+          <h3 class="t-lg" style="margin:6px 0 2px">Верх тела — гиря</h3>
+          <p class="sub">Жим · Отжимания · Тяга · Планка · 25 мин</p>
+          <div class="btn btn-pri" style="margin-top:12px">▶ Начать тренировку</div>
+        </div>
+        <div class="chips">
+          <span class="chip on">Гиря</span><span class="chip">Без снаряда</span>
+          <span class="chip">Ноги</span><span class="chip">Спина</span><span class="chip">Кор</span>
+        </div>
+        <p class="lbl">Популярное</p>
+        <div class="mini">
+          <div class="card"><div class="th">🏋️</div><b>Махи гирей</b><span>24 кг · Новичок</span></div>
+          <div class="card"><div class="th">💪</div><b>Отжимания</b><span>Без снаряда</span></div>
+          <div class="card"><div class="th">🦵</div><b>Гоблет-присед</b><span>24 кг</span></div>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="on"><i>⌂</i>Дом</div><div><i>▦</i>Каталог</div>
+        <div><i>▶</i>Тренировка</div><div><i>◉</i>Профиль</div>
+      </div>
+    </div><figcaption>02 · home</figcaption></figure>
+
+    <!-- 3. План недели -->
+    <figure class="shot"><div class="ph">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="scr">
+        <h3 class="t-xl">План недели</h3>
+        <div class="list">
+          <div class="day"><div class="ic">🏋️</div><div class="grow"><div class="nm">Понедельник</div><div class="ds">CrossFit · зал</div></div><span class="badge">✓</span></div>
+          <div class="day today"><div class="ic">💪</div><div class="grow"><div class="nm">Вторник</div><div class="ds">Верх тела · 4 упражнения · 25 мин</div></div><span class="badge pri">Сегодня</span></div>
+          <div class="day"><div class="ic">🏋️</div><div class="grow"><div class="nm">Среда</div><div class="ds">CrossFit · зал</div></div></div>
+          <div class="day"><div class="ic">🦵</div><div class="grow"><div class="nm">Четверг</div><div class="ds">Ноги · 3 упражнения · 20 мин</div></div></div>
+          <div class="day"><div class="ic">🏋️</div><div class="grow"><div class="nm">Пятница</div><div class="ds">CrossFit · зал</div></div></div>
+          <div class="day"><div class="ic">🎯</div><div class="grow"><div class="nm">Суббота</div><div class="ds">Кор · 4 упражнения · 20 мин</div></div></div>
+          <div class="day" style="opacity:.55"><div class="ic">🌙</div><div class="grow"><div class="nm">Воскресенье</div><div class="ds">День отдыха</div></div></div>
+        </div>
+      </div>
+      <div class="tabs">
+        <div><i>⌂</i>Дом</div><div class="on"><i>▦</i>Каталог</div>
+        <div><i>▶</i>Тренировка</div><div><i>◉</i>Профиль</div>
+      </div>
+    </div><figcaption>03 · weekly-plan</figcaption></figure>
+
+    <!-- 4. Каталог -->
+    <figure class="shot"><div class="ph">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="scr">
+        <h3 class="t-xl">Упражнения</h3>
+        <div class="card" style="padding:12px 16px;color:var(--dim)">🔍&nbsp; Поиск упражнения…</div>
+        <div class="seg"><span class="on">Гиря</span><span>Без снаряда</span><span>Все</span></div>
+        <p class="lbl">Ноги / Ягодицы</p>
+        <div class="card row">
+          <div class="ic2">🏋️</div>
+          <div class="grow"><p class="t-md">Махи гирей</p><p class="sub">Ягодицы · бицепс бедра</p></div>
+          <span class="badge pri">24 кг</span>
+        </div>
+        <div class="card row">
+          <div class="ic2">🦵</div>
+          <div class="grow"><p class="t-md">Гоблет-присед</p><p class="sub">Квадрицепсы · ягодицы</p></div>
+          <span class="badge pri">24 кг</span>
+        </div>
+        <p class="lbl">Спина</p>
+        <div class="card row">
+          <div class="ic2">🔙</div>
+          <div class="grow"><p class="t-md">Тяга в наклоне</p><p class="sub">Широчайшие · ромбовидные</p></div>
+          <span class="badge pri">24 кг</span>
+        </div>
+        <p class="lbl">Грудь / Плечи</p>
+        <div class="card row">
+          <div class="ic2">💪</div>
+          <div class="grow"><p class="t-md">Отжимания</p><p class="sub">Грудь · трицепс</p></div>
+          <span class="badge sec">Свой вес</span>
+        </div>
+        <p class="lbl">Кор</p>
+        <div class="card row">
+          <div class="ic2">🎯</div>
+          <div class="grow"><p class="t-md">Турецкий подъём</p><p class="sub">Всё тело · продвинутый</p></div>
+          <span class="badge pri">24 кг</span>
+        </div>
+      </div>
+      <div class="tabs">
+        <div><i>⌂</i>Дом</div><div class="on"><i>▦</i>Каталог</div>
+        <div><i>▶</i>Тренировка</div><div><i>◉</i>Профиль</div>
+      </div>
+    </div><figcaption>04 · catalog</figcaption></figure>
+
+    <!-- 5. Карточка: Махи гирей -->
+    <figure class="shot"><div class="ph">
+      <div class="stat"><span>‹ Назад</span><span>▮▮▮</span></div>
+      <div class="scr">
+        <div class="row">
+          <h3 class="t-xl grow">Махи гирей</h3>
+        </div>
+        <div class="chips"><span class="badge pri">Ноги / Ягодицы</span><span class="badge">Новичок</span></div>
+        <div class="media"><span class="badge tag">Техника · GIF</span><div class="play">▶</div></div>
+        <div class="seg"><span>16 кг</span><span class="on">24 кг</span><span>32 кг</span></div>
+        <div class="card">
+          <p class="lbl">Работающие мышцы</p>
+          <div class="mmwrap" style="margin-top:10px">
+            <svg class="mmsvg mm-swing" viewBox="0 0 90 250" width="76" height="211"><use href="#fig-f"/></svg>
+            <svg class="mmsvg mm-swing" viewBox="0 0 90 250" width="76" height="211"><use href="#fig-b"/></svg>
+            <div class="legend">
+              <span><i class="l1"></i>Основные</span>
+              <span><i class="l2"></i>Вспомогательные</span>
+              <span><i class="l3"></i>Стабилизаторы</span>
+            </div>
+          </div>
+          <p class="sub" style="margin-top:10px">Основные: ягодицы, бицепс бедра · Вспомогательные: разгибатели спины, широчайшие</p>
+        </div>
+        <div class="card">
+          <p class="lbl" style="color:var(--pri)">Техника</p>
+          <div class="steps" style="margin-top:10px">
+            <p><b>Исходное положение</b>Стопы шире плеч, гиря на полу перед собой.</p>
+            <p><b>Выполнение</b>Мах за счёт таза, не рук. Спина ровная.</p>
+            <p><b>Дыхание</b>Выдох в верхней точке маха.</p>
+            <p><b>Частые ошибки</b>Приседание вместо наклона, круглая спина.</p>
+          </div>
+        </div>
+        <div class="card row"><span class="grow t-md">Рекомендация</span><b style="font-variant-numeric:tabular-nums">4 × 15 · 24 кг</b></div>
+        <div class="btn btn-pri">▶ Начать таймер</div>
+        <div class="btn btn-ghost" style="margin-bottom:18px">+ Добавить в тренировку</div>
+      </div>
+    </div><figcaption>05 · exercise-detail · kettlebell swing</figcaption></figure>
+
+    <!-- 6. Карточка: Отжимания -->
+    <figure class="shot"><div class="ph">
+      <div class="stat"><span>‹ Назад</span><span>▮▮▮</span></div>
+      <div class="scr">
+        <h3 class="t-xl">Отжимания</h3>
+        <div class="chips"><span class="badge sec">Грудь / Плечи</span><span class="badge">Новичок</span><span class="badge sec">Свой вес</span></div>
+        <div class="media"><span class="badge tag">Техника · GIF</span><div class="play" style="background:var(--sec)">▶</div></div>
+        <div class="card">
+          <p class="lbl">Работающие мышцы</p>
+          <div class="mmwrap" style="margin-top:10px">
+            <svg class="mmsvg mm-push" viewBox="0 0 90 250" width="76" height="211"><use href="#fig-f"/></svg>
+            <svg class="mmsvg mm-push" viewBox="0 0 90 250" width="76" height="211"><use href="#fig-b"/></svg>
+            <div class="legend">
+              <span><i class="l1"></i>Основные</span>
+              <span><i class="l2"></i>Вспомогательные</span>
+              <span><i class="l3"></i>Стабилизаторы</span>
+            </div>
+          </div>
+          <p class="sub" style="margin-top:10px">Основные: грудь · Вспомогательные: трицепс, передние дельты · Стабилизатор: кор</p>
+        </div>
+        <div class="card">
+          <p class="lbl">Вариации</p>
+          <div class="chips" style="margin-top:8px">
+            <span class="chip">С колен</span><span class="chip on">Классика</span>
+            <span class="chip">Алмаз</span><span class="chip">Лучник</span>
+          </div>
+        </div>
+        <div class="card">
+          <p class="lbl" style="color:var(--pri)">Техника</p>
+          <div class="steps" style="margin-top:10px">
+            <p><b>Исходное положение</b>Планка, ладони под плечами.</p>
+            <p><b>Выполнение</b>Опускайся медленно, локти 45°.</p>
+            <p><b>Дыхание</b>Вдох вниз, выдох на подъёме.</p>
+            <p><b>Частые ошибки</b>Провал поясницы, разведённые локти.</p>
+          </div>
+        </div>
+        <div class="card row"><span class="grow t-md">Рекомендация</span><b>4 × 12</b></div>
+        <div class="btn btn-pri" style="margin-bottom:18px">▶ Начать таймер</div>
+      </div>
+    </div><figcaption>06 · exercise-detail · push-ups</figcaption></figure>
+
+    <!-- 7. Плеер -->
+    <figure class="shot"><div class="ph">
+      <div class="stat"><span>✕</span><span>🔊 Голос вкл</span></div>
+      <div class="scr" style="gap:18px">
+        <span class="pill">Работа</span>
+        <p class="timer">00:32</p>
+        <h3 class="t-lg" style="text-align:center">Махи гирей · 24 кг</h3>
+        <div class="media" style="height:130px"><div class="play">▶</div></div>
+        <div class="row">
+          <svg class="mmsvg mm-swing" viewBox="0 0 90 250" width="30" height="83"><use href="#fig-b"/></svg>
+          <div class="grow">
+            <p class="sub">Упражнение 3 из 8</p>
+            <div class="bar" style="margin-top:6px"><i style="width:37%"></i></div>
+          </div>
+        </div>
+        <div class="card row" style="padding:12px 16px">
+          <span class="sub grow">Дальше: отдых 20 с → Гоблет-присед</span>
+        </div>
+        <div class="btn btn-pri">❚❚ Пауза</div>
+        <div class="btn btn-ghost" style="margin-bottom:18px">Далее ›</div>
+      </div>
+    </div><figcaption>07 · workout-player</figcaption></figure>
+
+    <!-- 8. Завершение -->
+    <figure class="shot"><div class="ph">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="scr" style="gap:16px">
+        <div style="text-align:center;padding-top:8px">
+          <div class="avatar" style="margin:0 auto;width:64px;height:64px;font-size:28px">✓</div>
+          <h3 class="t-xl" style="margin-top:12px">Тренировка завершена!</h3>
+          <p class="sub">Отличная работа, Сергей</p>
+        </div>
+        <div class="kpi">
+          <div class="card"><b>24:30</b><span>Время</span></div>
+          <div class="card"><b>8</b><span>Упражнений</span></div>
+          <div class="card"><b>2 340</b><span>кг объём</span></div>
+        </div>
+        <div class="card">
+          <p class="lbl">Мышцы за сегодня</p>
+          <div class="mmwrap" style="margin-top:10px;justify-content:center">
+            <svg class="mmsvg mm-upper" viewBox="0 0 90 250" width="66" height="183"><use href="#fig-f"/></svg>
+            <svg class="mmsvg mm-upper" viewBox="0 0 90 250" width="66" height="183"><use href="#fig-b"/></svg>
+          </div>
+        </div>
+        <div class="card row">
+          <span class="flame" style="font-size:16px">🔥</span>
+          <span class="grow t-md">Серия: 13 дней</span>
+          <span class="badge pri">+1</span>
+        </div>
+        <div class="btn btn-pri">Готово</div>
+        <div class="btn btn-ghost" style="margin-bottom:18px">Поделиться</div>
+      </div>
+    </div><figcaption>08 · workout-complete</figcaption></figure>
+
+    <!-- 9. Прогресс -->
+    <figure class="shot"><div class="ph">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="scr">
+        <h3 class="t-xl">Прогресс</h3>
+        <div class="seg"><span class="on">Неделя</span><span>Месяц</span><span>Год</span></div>
+        <div class="card">
+          <p class="lbl">Тренировки</p>
+          <div class="heat" style="margin-top:10px">
+            <i class="h2"></i><i class="h3"></i><i></i><i class="h1"></i><i class="h3"></i><i class="h2"></i><i></i>
+            <i class="h1"></i><i></i><i class="h3"></i><i class="h2"></i><i></i><i class="h3"></i><i class="h1"></i>
+            <i class="h3"></i><i class="h2"></i><i></i><i class="h3"></i><i class="h1"></i><i></i><i class="h2"></i>
+          </div>
+        </div>
+        <div class="card">
+          <p class="lbl">Восстановление мышц</p>
+          <div class="mmwrap" style="margin-top:10px">
+            <svg class="mmsvg mm-rec" viewBox="0 0 90 250" width="70" height="194"><use href="#fig-f"/></svg>
+            <svg class="mmsvg mm-rec" viewBox="0 0 90 250" width="70" height="194"><use href="#fig-b"/></svg>
+            <div class="legend">
+              <span><i class="l1"></i>Готовы</span>
+              <span><i style="background:var(--rest)"></i>Восстановление</span>
+            </div>
+          </div>
+          <p class="sub" style="margin-top:10px">Ягодицы 45% — отдых 1 день · Квадрицепсы 60%</p>
+        </div>
+        <div class="kpi">
+          <div class="card"><b>16</b><span>Тренировок</span></div>
+          <div class="card"><b>6:45</b><span>Часов</span></div>
+          <div class="card"><b>4</b><span>Рекорда</span></div>
+        </div>
+        <div class="card">
+          <p class="lbl">Личные рекорды</p>
+          <div class="list" style="margin-top:8px">
+            <div class="row"><span class="grow sub">Махи гирей</span><b>24 кг × 20</b></div>
+            <div class="row"><span class="grow sub">Гоблет-присед</span><b>32 кг × 8</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="tabs">
+        <div><i>⌂</i>Дом</div><div><i>▦</i>Каталог</div>
+        <div class="on"><i>▶</i>Тренировка</div><div><i>◉</i>Профиль</div>
+      </div>
+    </div><figcaption>09 · progress-recovery</figcaption></figure>
+
+    <!-- 10. Профиль -->
+    <figure class="shot"><div class="ph">
+      <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="scr">
+        <div class="row">
+          <div class="avatar">С</div>
+          <div class="grow">
+            <h3 class="t-lg">Сергей</h3>
+            <p class="sub">Тренируется с 2026 · 🔥 13 дней</p>
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="card"><b>16</b><span>Тренировок</span></div>
+          <div class="card"><b>6:45</b><span>Часов</span></div>
+          <div class="card"><b>4</b><span>Рекорда</span></div>
+        </div>
+        <div class="card">
+          <p class="lbl">Любимые упражнения</p>
+          <div class="list" style="margin-top:8px">
+            <div class="row"><span>🏋️</span><span class="grow sub">Махи гирей</span></div>
+            <div class="row"><span>💪</span><span class="grow sub">Отжимания</span></div>
+            <div class="row"><span>🦵</span><span class="grow sub">Гоблет-присед</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="lbl">Настройки</p>
+          <div class="list" style="margin-top:10px">
+            <div class="row"><span class="grow sub">Тема</span><span class="badge">Тёмная</span></div>
+            <div class="row"><span class="grow sub">Гиря по умолчанию</span></div>
+            <div class="seg"><span>16</span><span class="on">24</span><span>32</span></div>
+            <div class="row"><span class="grow sub">Голосовые подсказки</span><div class="togg"></div></div>
+            <div class="row"><span class="grow sub">Вибрация</span><div class="togg"></div></div>
+            <div class="row"><span class="grow sub">Отдых между упражнениями</span><span class="badge">20 с</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="tabs">
+        <div><i>⌂</i>Дом</div><div><i>▦</i>Каталог</div>
+        <div><i>▶</i>Тренировка</div><div class="on"><i>◉</i>Профиль</div>
+      </div>
+    </div><figcaption>10 · profile-settings</figcaption></figure>
+
+  </div>
+</section>
+
+<!-- ================= ВАРИАНТ B ================= -->
+<section class="varsec vb" id="vb">
+  <div class="sechead">
+    <h2>Вариант B — Arctic Pulse</h2>
+    <span class="pal">
+      <i style="background:#0B0F17"></i><i style="background:#141A26"></i>
+      <i style="background:#22D3EE"></i><i style="background:#8B5CF6"></i><i style="background:#F43F5E"></i>
+    </span>
+    <span class="note">ледяной циан · фиолет · мышцы — тепловая карта красным</span>
+  </div>
+  <div class="grid" id="clone"></div>
+</section>
+
+<footer style="margin-top:56px;color:var(--pg-dim);font-size:13px;border-top:1px solid var(--pg-line);padding-top:20px">
+  Kettle&Body · дизайн-макеты v2 · без оранжевого · та же спецификация, что и для Stitch-проекта
+  «Kettle&Body — Workout App» · исходник: <code>design/kettlebody-mockups.html</code>
+</footer>
+</div>
+
+<script>
+  // Вариант B — тот же набор экранов, палитра меняется CSS-переменными секции .vb
+  var m = document.getElementById('master').cloneNode(true);
+  var defs = m.querySelector('svg[aria-hidden]');   // определения фигур не дублируем
+  if (defs) defs.remove();
+  document.getElementById('clone').innerHTML = m.innerHTML;
+</script>
