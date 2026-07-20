@@ -16,6 +16,7 @@ import {
   SafeAreaView,
   View,
   Text,
+  TextInput,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -24,6 +25,7 @@ import {
   Platform,
 } from "react-native";
 import * as Speech from "expo-speech";
+import Svg, { Circle, Rect, Ellipse, Path } from "react-native-svg";
 
 // ============================================================================
 // КОЛЬОРИ — «Volt Impact»
@@ -212,6 +214,128 @@ const CATALOG = [
 const byId = Object.fromEntries(CATALOG.map((e) => [e.id, e]));
 
 // ============================================================================
+// КАРТА М'ЯЗІВ — які м'язи підсвічувати для кожної вправи
+// 1 = основні (лайм), 2 = допоміжні (смарагд), 3 = стабілізатори (тьмяний)
+// Ключі: delt pec bic forearm abs obl quad calf (перед) · trap tri lat erec glute ham (спина)
+// ============================================================================
+const MM = {
+  "kb-goblet":   { quad: 1, glute: 1, erec: 2, abs: 3 },
+  "kb-swing":    { glute: 1, ham: 1, erec: 2, lat: 2, abs: 3 },
+  "kb-rdl":      { ham: 1, glute: 1, erec: 2, abs: 3 },
+  "kb-lunge":    { quad: 1, glute: 1, ham: 2, abs: 3 },
+  "kb-sumo":     { quad: 1, glute: 1, abs: 3 },
+  "kb-bulg":     { glute: 1, quad: 1, ham: 2, abs: 3 },
+  "kb-row":      { lat: 1, trap: 2, delt: 2, bic: 2, erec: 3, abs: 3 },
+  "kb-row1":     { lat: 1, trap: 2, bic: 2, abs: 3 },
+  "kb-dead":     { erec: 1, glute: 1, ham: 2, trap: 3, abs: 3 },
+  "kb-press":    { delt: 1, tri: 2, abs: 3, glute: 3 },
+  "kb-push":     { delt: 1, quad: 2, tri: 2, abs: 3 },
+  "kb-floor":    { pec: 1, tri: 2, delt: 2, abs: 3 },
+  "kb-arnold":   { delt: 1, tri: 2, abs: 3 },
+  "kb-curl":     { bic: 1, forearm: 2, abs: 3 },
+  "kb-tri":      { tri: 1, delt: 2, abs: 3 },
+  "kb-tgu":      { abs: 1, delt: 1, glute: 2, quad: 2 },
+  "kb-twist":    { obl: 1, abs: 2 },
+  "kb-renegade": { abs: 1, lat: 1, delt: 2, tri: 2, glute: 3 },
+  "kb-windmill": { obl: 1, delt: 2, glute: 2, ham: 3 },
+  "kb-snatch":   { glute: 1, ham: 1, delt: 1, erec: 2, abs: 3 },
+  "kb-clean":    { quad: 1, erec: 1, delt: 2, bic: 2, abs: 3 },
+  "kb-cp":       { quad: 1, delt: 1, tri: 2, abs: 3 },
+  "kb-thruster": { quad: 1, delt: 1, tri: 2, abs: 3 },
+  "bw-squat":    { quad: 1, glute: 1, ham: 2, abs: 3 },
+  "bw-lunge":    { quad: 1, glute: 1, ham: 2, abs: 3 },
+  "bw-bridge":   { glute: 1, ham: 2, abs: 3 },
+  "bw-pistol":   { quad: 1, glute: 1, abs: 2 },
+  "bw-pushup":   { pec: 1, tri: 2, delt: 2, abs: 3 },
+  "bw-dips":     { tri: 1, pec: 2, delt: 2, abs: 3 },
+  "bw-pullup":   { lat: 1, bic: 2, trap: 2, abs: 3 },
+  "bw-plank":    { abs: 1, obl: 2, delt: 2, glute: 3 },
+  "bw-crunch":   { abs: 1, obl: 2 },
+  "bw-climber":  { abs: 1, quad: 2, delt: 2 },
+  "bw-superman": { erec: 1, glute: 2, delt: 3 },
+  "bw-burpee":   { pec: 1, quad: 1, abs: 2, delt: 2 },
+  "bw-jack":     { calf: 1, delt: 1, quad: 2 },
+};
+
+// М'язи спини — щоб мініатюра показувала потрібний бік фігури
+const BACK_KEYS = ["trap", "tri", "lat", "erec", "glute", "ham"];
+
+const MM_COLORS = {
+  1: COLORS.accent,
+  2: COLORS.accentSec,
+  3: "#31572e",
+  off: "#2A2E36",
+  sil: "#1c1f26",
+};
+function mColor(mm, key) {
+  return MM_COLORS[mm[key]] || MM_COLORS.off;
+}
+
+// Фігура спереду (viewBox 0 0 90 250)
+function BodyFront({ mm, width = 76 }) {
+  return (
+    <Svg width={width} height={(width * 250) / 90} viewBox="0 0 90 250">
+      <Circle cx="45" cy="16" r="12" fill={MM_COLORS.sil} />
+      <Rect x="39" y="26" width="12" height="10" rx="4" fill={MM_COLORS.sil} />
+      <Path d="M18 40 Q45 30 72 40 L74 120 Q45 132 16 120 Z" fill={MM_COLORS.sil} />
+      <Rect x="2" y="44" width="16" height="70" rx="8" fill={MM_COLORS.sil} />
+      <Rect x="72" y="44" width="16" height="70" rx="8" fill={MM_COLORS.sil} />
+      <Rect x="24" y="128" width="18" height="118" rx="9" fill={MM_COLORS.sil} />
+      <Rect x="48" y="128" width="18" height="118" rx="9" fill={MM_COLORS.sil} />
+      <Ellipse cx="16" cy="48" rx="9" ry="11" fill={mColor(mm, "delt")} />
+      <Ellipse cx="74" cy="48" rx="9" ry="11" fill={mColor(mm, "delt")} />
+      <Ellipse cx="33" cy="56" rx="12" ry="9" fill={mColor(mm, "pec")} />
+      <Ellipse cx="57" cy="56" rx="12" ry="9" fill={mColor(mm, "pec")} />
+      <Ellipse cx="10" cy="74" rx="6" ry="12" fill={mColor(mm, "bic")} />
+      <Ellipse cx="80" cy="74" rx="6" ry="12" fill={mColor(mm, "bic")} />
+      <Rect x="36" y="70" width="18" height="42" rx="8" fill={mColor(mm, "abs")} />
+      <Path d="M28 74 L34 72 L34 112 L26 106 Z" fill={mColor(mm, "obl")} />
+      <Path d="M62 74 L56 72 L56 112 L64 106 Z" fill={mColor(mm, "obl")} />
+      <Rect x="26" y="134" width="14" height="54" rx="7" fill={mColor(mm, "quad")} />
+      <Rect x="50" y="134" width="14" height="54" rx="7" fill={mColor(mm, "quad")} />
+      <Rect x="27" y="200" width="12" height="34" rx="6" fill={mColor(mm, "calf")} />
+      <Rect x="51" y="200" width="12" height="34" rx="6" fill={mColor(mm, "calf")} />
+    </Svg>
+  );
+}
+
+// Фігура ззаду
+function BodyBack({ mm, width = 76 }) {
+  return (
+    <Svg width={width} height={(width * 250) / 90} viewBox="0 0 90 250">
+      <Circle cx="45" cy="16" r="12" fill={MM_COLORS.sil} />
+      <Path d="M18 40 Q45 30 72 40 L74 120 Q45 132 16 120 Z" fill={MM_COLORS.sil} />
+      <Rect x="2" y="44" width="16" height="70" rx="8" fill={MM_COLORS.sil} />
+      <Rect x="72" y="44" width="16" height="70" rx="8" fill={MM_COLORS.sil} />
+      <Rect x="24" y="128" width="18" height="118" rx="9" fill={MM_COLORS.sil} />
+      <Rect x="48" y="128" width="18" height="118" rx="9" fill={MM_COLORS.sil} />
+      <Path d="M33 34 L45 28 L57 34 L52 58 L38 58 Z" fill={mColor(mm, "trap")} />
+      <Ellipse cx="16" cy="48" rx="9" ry="11" fill={mColor(mm, "delt")} />
+      <Ellipse cx="74" cy="48" rx="9" ry="11" fill={mColor(mm, "delt")} />
+      <Ellipse cx="10" cy="76" rx="6" ry="13" fill={mColor(mm, "tri")} />
+      <Ellipse cx="80" cy="76" rx="6" ry="13" fill={mColor(mm, "tri")} />
+      <Path d="M26 60 L38 62 L36 96 L24 88 Z" fill={mColor(mm, "lat")} />
+      <Path d="M64 60 L52 62 L54 96 L66 88 Z" fill={mColor(mm, "lat")} />
+      <Rect x="40" y="62" width="4.5" height="50" rx="2" fill={mColor(mm, "erec")} />
+      <Rect x="45.5" y="62" width="4.5" height="50" rx="2" fill={mColor(mm, "erec")} />
+      <Ellipse cx="36" cy="124" rx="11" ry="12" fill={mColor(mm, "glute")} />
+      <Ellipse cx="54" cy="124" rx="11" ry="12" fill={mColor(mm, "glute")} />
+      <Rect x="26" y="140" width="14" height="50" rx="7" fill={mColor(mm, "ham")} />
+      <Rect x="50" y="140" width="14" height="50" rx="7" fill={mColor(mm, "ham")} />
+      <Rect x="27" y="198" width="12" height="36" rx="6" fill={mColor(mm, "calf")} />
+      <Rect x="51" y="198" width="12" height="36" rx="6" fill={mColor(mm, "calf")} />
+    </Svg>
+  );
+}
+
+// Мініатюра для карток каталогу — показує бік, де основні м'язи
+function MiniMap({ exId, width = 34 }) {
+  const mm = MM[exId] || {};
+  const isBack = BACK_KEYS.some((k) => mm[k] === 1);
+  return isBack ? <BodyBack mm={mm} width={width} /> : <BodyFront mm={mm} width={width} />;
+}
+
+// ============================================================================
 // ТИЖНЕВИЙ ПЛАН — домашні дні збираються з каталогу
 // ============================================================================
 const SCHEDULE = {
@@ -392,12 +516,23 @@ function HomeScreen({ dayConfig, onStart, onOpen }) {
 // ============================================================================
 function CatalogScreen({ onOpen }) {
   const [filter, setFilter] = useState("all"); // all | kb | bw
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
   const visible = CATALOG.filter(
-    (e) => filter === "all" || (filter === "kb" ? e.kb : !e.kb)
+    (e) =>
+      (filter === "all" || (filter === "kb" ? e.kb : !e.kb)) &&
+      (!q || e.name.toLowerCase().includes(q) || e.muscles.p.toLowerCase().includes(q))
   );
   return (
-    <ScrollView contentContainerStyle={styles.homeScroll}>
+    <ScrollView contentContainerStyle={styles.homeScroll} keyboardShouldPersistTaps="handled">
       <Text style={styles.appTitle}>Вправи</Text>
+      <TextInput
+        style={styles.search}
+        placeholder="🔍  Пошук вправи…"
+        placeholderTextColor={COLORS.textDim}
+        value={query}
+        onChangeText={setQuery}
+      />
       <View style={styles.seg}>
         {[["kb", "Гиря"], ["bw", "Своя вага"], ["all", "Всі"]].map(([key, lbl]) => (
           <TouchableOpacity
@@ -414,19 +549,21 @@ function CatalogScreen({ onOpen }) {
         if (!items.length) return null;
         return (
           <View key={g.id}>
-            <Text style={styles.groupLabel}>{g.icon}  {g.name}</Text>
+            <Text style={styles.groupLabel}>{g.name}</Text>
             {items.map((ex) => (
               <TouchableOpacity key={ex.id} style={styles.previewItem} onPress={() => onOpen(ex)}>
-                <Text style={styles.exIcon}>{ex.icon}</Text>
+                <View style={styles.thumb}>
+                  <MiniMap exId={ex.id} width={30} />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.previewName}>{ex.name}</Text>
                   <Text style={styles.previewMeta}>{ex.muscles.p}</Text>
+                  <Text style={[styles.previewMeta, { marginTop: 3 }]}>{ex.level}</Text>
                 </View>
-                <View style={{ alignItems: "flex-end", gap: 4 }}>
-                  <Text style={[styles.badge, ex.kb ? styles.badgeKb : styles.badgeBw]}>
+                <View style={ex.kb ? styles.pillKb : styles.pillBw}>
+                  <Text style={ex.kb ? styles.pillKbText : styles.pillBwText}>
                     {ex.kb ? "24 кг" : "Своя вага"}
                   </Text>
-                  <Text style={styles.previewMeta}>{ex.level}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -450,10 +587,20 @@ function DetailScreen({ ex, onBack, onStart }) {
       </TouchableOpacity>
       <Text style={[styles.appTitle, { marginTop: 8 }]}>{ex.name}</Text>
       <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-        <Text style={[styles.badge, styles.badgeKb]}>
-          {GROUPS.find((g) => g.id === ex.group).name}
-        </Text>
-        <Text style={[styles.badge, styles.badgeBw]}>{ex.level}</Text>
+        <View style={styles.pillKb}>
+          <Text style={styles.pillKbText}>{GROUPS.find((g) => g.id === ex.group).name}</Text>
+        </View>
+        <View style={styles.pillBw}>
+          <Text style={styles.pillBwText}>{ex.level}</Text>
+        </View>
+      </View>
+
+      {/* Блок техніки (місце під GIF/відео) */}
+      <View style={styles.media}>
+        <Text style={styles.mediaTag}>ТЕХНІКА · GIF</Text>
+        <View style={styles.playBtn}>
+          <Text style={{ color: COLORS.onAccent, fontSize: 20, fontWeight: "900" }}>▶</Text>
+        </View>
       </View>
 
       {/* Перемикач ваги — лише для гирі */}
@@ -471,10 +618,28 @@ function DetailScreen({ ex, onBack, onStart }) {
         </View>
       )}
 
-      {/* М'язи */}
+      {/* Карта м'язів — перед + спина, як у макетах */}
       <View style={styles.descCard}>
         <Text style={styles.descTitle}>Працюючі м'язи</Text>
-        <Text style={styles.descText}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginTop: 6 }}>
+          <BodyFront mm={MM[ex.id] || {}} width={72} />
+          <BodyBack mm={MM[ex.id] || {}} width={72} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <View style={styles.legendRow}>
+              <View style={[styles.legendDot, { backgroundColor: COLORS.accent }]} />
+              <Text style={styles.previewMeta}>Основні</Text>
+            </View>
+            <View style={styles.legendRow}>
+              <View style={[styles.legendDot, { backgroundColor: COLORS.accentSec }]} />
+              <Text style={styles.previewMeta}>Допоміжні</Text>
+            </View>
+            <View style={styles.legendRow}>
+              <View style={[styles.legendDot, { backgroundColor: "#31572e" }]} />
+              <Text style={styles.previewMeta}>Стабілізатори</Text>
+            </View>
+          </View>
+        </View>
+        <Text style={[styles.descText, { marginTop: 10 }]}>
           <Text style={{ color: COLORS.accent }}>Основні:</Text> {ex.muscles.p}{"\n"}
           <Text style={{ color: COLORS.accentSec }}>Допоміжні:</Text> {ex.muscles.s}{"\n"}
           <Text style={{ color: COLORS.textDim }}>Стабілізатори:</Text> {ex.muscles.st}
@@ -625,7 +790,10 @@ function WorkoutScreen({ plan, onExit }) {
       <Text style={[styles.phaseLabel, { color: phaseInfo.color }]}>{phaseInfo.label}</Text>
       <Text style={styles.exerciseName}>{current.name}</Text>
       <View style={styles.iconWrap}>
-        <Text style={{ fontSize: 84 }}>{current.ex.icon}</Text>
+        <View style={{ flexDirection: "row", gap: 18 }}>
+          <BodyFront mm={MM[current.ex.id] || {}} width={62} />
+          <BodyBack mm={MM[current.ex.id] || {}} width={62} />
+        </View>
       </View>
       <Text style={[styles.timer, { color: phaseInfo.color }]}>{fmt(remaining)}</Text>
       <View style={styles.descCard}>
@@ -695,12 +863,40 @@ const styles = StyleSheet.create({
     color: COLORS.textDim, fontSize: 12, fontWeight: "800",
     letterSpacing: 1.5, textTransform: "uppercase", marginTop: 18, marginBottom: 10,
   },
-  badge: {
-    borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10,
-    fontSize: 11, fontWeight: "800", overflow: "hidden",
+  search: {
+    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12,
+    color: COLORS.text, fontSize: 15, marginBottom: 12,
   },
-  badgeKb: { backgroundColor: "rgba(198,255,0,0.15)", color: COLORS.accent },
-  badgeBw: { backgroundColor: "rgba(76,217,100,0.15)", color: COLORS.accentSec },
+  thumb: {
+    width: 48, height: 64, borderRadius: 12, backgroundColor: COLORS.cardAlt,
+    alignItems: "center", justifyContent: "center", overflow: "hidden",
+  },
+  pillKb: {
+    backgroundColor: COLORS.accent, borderRadius: 999,
+    paddingVertical: 5, paddingHorizontal: 12, alignSelf: "flex-start",
+  },
+  pillKbText: { color: COLORS.onAccent, fontSize: 11, fontWeight: "800" },
+  pillBw: {
+    backgroundColor: "rgba(76,217,100,0.16)", borderRadius: 999,
+    paddingVertical: 5, paddingHorizontal: 12, alignSelf: "flex-start",
+  },
+  pillBwText: { color: COLORS.accentSec, fontSize: 11, fontWeight: "800" },
+  media: {
+    height: 160, borderRadius: 20, backgroundColor: COLORS.cardAlt,
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: 16,
+    alignItems: "center", justifyContent: "center",
+  },
+  mediaTag: {
+    position: "absolute", left: 14, top: 12, color: COLORS.textDim,
+    fontSize: 10, fontWeight: "800", letterSpacing: 1.2,
+  },
+  playBtn: {
+    width: 54, height: 54, borderRadius: 27, backgroundColor: COLORS.accent,
+    alignItems: "center", justifyContent: "center",
+  },
+  legendRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  legendDot: { width: 11, height: 11, borderRadius: 3 },
 
   seg: {
     flexDirection: "row", backgroundColor: COLORS.cardAlt,
