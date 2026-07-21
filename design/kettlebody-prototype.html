@@ -1,0 +1,424 @@
+<title>Kettle&Body — інтерактивний прототип</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0A0B0E; --sur:#15171C; --elev:#1E2128; --pri:#C6FF00; --onpri:#0A0B0E;
+    --sec:#4CD964; --rest:#7A8CA3; --txt:#FFFFFF; --dim:#9AA0AC;
+    --line:rgba(255,255,255,.08);
+    --m1:#C6FF00; --m2:#4CD964; --m3:#31572e; --moff:#2A2E36; --sil:#1c1f26;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:#000;color:var(--txt);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex;align-items:center;justify-content:center;min-height:100dvh;padding:16px}
+  /* Рамка телефону */
+  .phone{width:390px;max-width:100%;height:min(844px,94dvh);background:var(--bg);
+    border:1px solid #23252c;border-radius:34px;overflow:hidden;position:relative;
+    display:flex;flex-direction:column;box-shadow:0 30px 90px rgba(0,0,0,.6)}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;
+    transform:translateX(100%);transition:transform .32s cubic-bezier(.4,0,.2,1);
+    background:var(--bg)}
+  .screen.active{transform:translateX(0)}
+  .screen.left{transform:translateX(-24%);filter:brightness(.5)}
+  .scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 18px 90px}
+  .scroll::-webkit-scrollbar{display:none}
+  @media (prefers-reduced-motion:reduce){.screen{transition:none}}
+
+  .stat{display:flex;justify-content:space-between;padding:12px 22px 2px;font-size:12px;font-weight:700;color:var(--dim)}
+  .h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:6px 0 4px}
+  .h2{font-size:22px;font-weight:800;margin:0}
+  .lbl{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .sec-lbl{font-size:14px;font-weight:800;letter-spacing:1.4px;margin:16px 0 10px}
+  .dim{color:var(--dim);font-size:13px}
+  .back{color:var(--dim);font-size:16px;font-weight:600;background:none;border:0;padding:8px 0;cursor:pointer}
+  .card{background:var(--sur);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
+  .row{display:flex;align-items:center;gap:12px}
+  .grow{flex:1}
+  .pill{border-radius:999px;padding:5px 12px;font-size:11px;font-weight:800;display:inline-block}
+  .pill-kb{background:var(--pri);color:var(--onpri)}
+  .pill-bw{background:rgba(76,217,100,.16);color:var(--sec)}
+  .pill-lv{background:rgba(76,217,100,.14);color:var(--sec)}
+  .btn{border:0;border-radius:16px;padding:16px;width:100%;font-size:16px;font-weight:800;cursor:pointer;text-align:center}
+  .btn-pri{background:var(--pri);color:var(--onpri)}
+  .btn-ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+  .thumb{width:48px;height:62px;border-radius:12px;background:var(--elev);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
+  .ex-row{cursor:pointer}
+  .ex-row:active{transform:scale(.99)}
+  .seg{display:flex;background:var(--elev);border-radius:14px;padding:4px;gap:4px;margin:12px 0}
+  .seg button{flex:1;border:0;background:none;color:var(--dim);font-weight:700;font-size:14px;padding:9px 0;border-radius:11px;cursor:pointer}
+  .seg button.on{background:var(--pri);color:var(--onpri)}
+
+  /* Медіа-блок з ▶ */
+  .media{position:relative;height:200px;border-radius:20px;overflow:hidden;margin-bottom:14px;
+    background:radial-gradient(120% 90% at 50% 20%, #1b2a10, #0d1408);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid var(--line)}
+  .media .play{width:64px;height:64px;border-radius:50%;background:var(--pri);color:var(--onpri);
+    display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;
+    box-shadow:0 0 0 0 rgba(198,255,0,.5);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(198,255,0,.45)}70%{box-shadow:0 0 0 18px rgba(198,255,0,0)}100%{box-shadow:0 0 0 0 rgba(198,255,0,0)}}
+  .media .cap{position:absolute;bottom:12px;font-size:11px;font-weight:800;letter-spacing:1.4px;text-shadow:0 1px 4px #000}
+  .hint{position:absolute;top:12px;left:12px;font-size:10px;font-weight:800;letter-spacing:1px;color:var(--dim)}
+
+  /* Кроки техніки */
+  .step{background:var(--sur);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:9px}
+  .step b{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px}
+  .legend span{font-size:12px;color:var(--dim)}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+  /* Таб-бар */
+  .tabs{position:absolute;bottom:0;left:0;right:0;display:flex;background:var(--sur);border-top:1px solid var(--line)}
+  .tabs button{flex:1;border:0;background:none;color:var(--dim);font-size:11px;font-weight:700;padding:10px 0 16px;cursor:pointer}
+  .tabs button.on{color:var(--pri)}
+  .tabs i{display:block;font-style:normal;font-size:18px;margin-bottom:2px}
+
+  /* Оверлей анімації техніки */
+  .overlay{position:absolute;inset:0;background:rgba(6,7,9,.96);z-index:20;
+    display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+  .overlay.show{display:flex}
+  .overlay h3{margin:0 0 4px;font-size:22px;font-weight:800}
+  .overlay .phase{color:var(--pri);font-weight:800;letter-spacing:1.5px;font-size:12px;margin-bottom:18px}
+  .overlay .close{position:absolute;top:16px;right:20px;font-size:26px;color:var(--dim);background:none;border:0;cursor:pointer}
+
+  /* Таймер */
+  .timer-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
+  .phase-pill{border-radius:999px;padding:7px 20px;font-size:12px;font-weight:900;letter-spacing:2px}
+  .timer{font-size:84px;font-weight:900;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin:0;line-height:1}
+  .prog{height:6px;width:100%;border-radius:3px;background:var(--elev);overflow:hidden}
+  .prog i{display:block;height:100%;background:var(--pri);transition:width .3s}
+
+  /* Екран завершення */
+  .done{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:32px;text-align:center}
+  .ring{width:88px;height:88px;border-radius:50%;border:4px solid var(--pri);display:flex;align-items:center;justify-content:center;font-size:40px;color:var(--pri);margin-bottom:8px}
+  .kpi{display:flex;gap:10px;width:100%;margin:16px 0}
+  .kpi div{flex:1;background:var(--sur);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+  .kpi b{display:block;font-size:20px;font-weight:800}
+  .kpi span{font-size:11px;color:var(--dim)}
+  .toast{position:absolute;left:16px;right:16px;bottom:20px;background:var(--pri);color:var(--onpri);
+    border-radius:14px;padding:12px 16px;font-weight:800;transform:translateY(140%);transition:transform .35s;text-align:center}
+  .toast.show{transform:translateY(0)}
+  .flowtag{position:absolute;top:10px;left:0;right:0;text-align:center;font-size:10px;color:var(--dim);letter-spacing:1px;pointer-events:none}
+</style>
+
+<div class="phone" id="phone">
+  <!-- ЕКРАН: Каталог -->
+  <section class="screen active" id="s-catalog">
+    <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+    <div class="scroll">
+      <div class="h1">Вправи</div>
+      <div class="card dim" style="padding:12px 16px">🔍&nbsp; Пошук вправи…</div>
+      <div class="seg"><button class="on">Гиря</button><button>Своя вага</button><button>Всі</button></div>
+      <div class="sec-lbl" style="color:var(--dim)">ГРУДИ / ПЛЕЧІ</div>
+      <div id="ex-list"></div>
+    </div>
+    <div class="tabs">
+      <button><i>⌂</i>Головна</button>
+      <button class="on"><i>▦</i>Каталог</button>
+      <button><i>▶</i>Тренування</button>
+      <button><i>◉</i>Профіль</button>
+    </div>
+  </section>
+
+  <!-- ЕКРАН: Картка вправи -->
+  <section class="screen" id="s-detail">
+    <div class="stat"><span>9:41</span><span>▮▮▮</span></div>
+    <div class="scroll">
+      <button class="back" onclick="go('s-catalog')">‹ Назад</button>
+      <div class="h1" id="d-name">Жим стоячи</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <span class="pill pill-kb" id="d-group">Груди / Плечі</span>
+        <span class="pill pill-lv" id="d-level">Середній</span>
+      </div>
+
+      <div class="media" id="d-media" onclick="playTechnique()">
+        <div class="hint">ТЕХНІКА</div>
+        <div class="play">▶</div>
+        <div class="cap">ТЕХНІКА · ПЕТЛЯ</div>
+      </div>
+
+      <div class="seg" id="d-weight">
+        <button data-w="16">16 кг</button>
+        <button class="on" data-w="24">24 кг</button>
+        <button data-w="32">32 кг</button>
+      </div>
+
+      <div class="sec-lbl">КАРТА М'ЯЗІВ</div>
+      <div class="card">
+        <div class="row" style="justify-content:center;gap:16px" id="d-map"></div>
+        <div class="legend">
+          <span><i style="background:var(--m1)"></i>Основні</span>
+          <span><i style="background:var(--m2)"></i>Допоміжні</span>
+          <span><i style="background:var(--m3)"></i>Стабілізатори</span>
+        </div>
+        <div class="dim" style="margin-top:8px" id="d-muscles"></div>
+      </div>
+
+      <div class="sec-lbl">ТЕХНІКА</div>
+      <div id="d-steps"></div>
+
+      <div class="card row"><span class="grow" style="font-weight:700">Рекомендація</span>
+        <b id="d-rec" style="color:var(--pri)">4 × 8 · 24 кг</b></div>
+
+      <button class="btn btn-pri" style="margin-bottom:10px" onclick="startTimer()">▶  Почати таймер</button>
+      <button class="btn btn-ghost">+ Додати в тренування</button>
+    </div>
+
+    <!-- Оверлей анімації техніки -->
+    <div class="overlay" id="anim-overlay">
+      <button class="close" onclick="closeTechnique()">✕</button>
+      <h3 id="anim-name">Жим стоячи</h3>
+      <div class="phase">АНІМАЦІЯ ТЕХНІКИ · ПЕТЛЯ</div>
+      <div id="anim-stage"></div>
+      <div class="dim" id="anim-phase" style="margin-top:18px">Стійка → Жим → Локаут</div>
+      <button class="btn btn-pri" style="margin-top:24px;max-width:240px" onclick="closeTechnique(); startTimer()">Почати таймер ›</button>
+    </div>
+  </section>
+
+  <!-- ЕКРАН: Плеер тренування -->
+  <section class="screen" id="s-player">
+    <div class="stat"><span id="p-count">1 / 6</span><span>🔊 Голос</span></div>
+    <div class="timer-wrap">
+      <div class="phase-pill" id="p-phase">РОБОТА</div>
+      <div class="timer" id="p-timer">00:40</div>
+      <div class="h2" id="p-name">Жим стоячи</div>
+      <div id="p-map"></div>
+      <div class="prog"><i id="p-prog" style="width:0%"></i></div>
+      <div class="dim" id="p-next">Далі: відпочинок 20 с</div>
+    </div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-pri" id="p-toggle" onclick="togglePause()">❚❚  Пауза</button>
+      <button class="btn btn-ghost" onclick="nextPhase(true)">Далі ›</button>
+      <button class="back" style="align-self:center" onclick="stopTimer();go('s-detail')">‹ Вийти</button>
+    </div>
+  </section>
+
+  <!-- ЕКРАН: Завершення -->
+  <section class="screen" id="s-done">
+    <div class="done">
+      <div class="ring">✓</div>
+      <div class="h2">Тренування завершено!</div>
+      <div class="dim">Чудова робота, Сергію</div>
+      <div class="kpi">
+        <div><b id="done-time">04:00</b><span>Час</span></div>
+        <div><b>6</b><span>Підходів</span></div>
+        <div><b>+1</b><span>🔥 14 днів</span></div>
+      </div>
+      <button class="btn btn-pri" onclick="go('s-catalog')">Готово · до каталогу</button>
+    </div>
+    <div class="toast" id="done-toast">🏆 Ачівка: перший тиждень!</div>
+  </section>
+
+  <div class="flowtag" id="flowtag"></div>
+</div>
+
+<script>
+// ── SVG-фігура м'язів (перед/спина) ─────────────────────────────────────────
+const COL={1:'#C6FF00',2:'#4CD964',3:'#31572e',off:'#2A2E36',sil:'#1c1f26'};
+function c(mm,k){return COL[mm[k]]||COL.off;}
+function front(mm,w=70){const h=w*250/90;return `<svg width="${w}" height="${h}" viewBox="0 0 90 250">
+<circle cx="45" cy="16" r="12" fill="${COL.sil}"/><rect x="39" y="26" width="12" height="10" rx="4" fill="${COL.sil}"/>
+<path d="M18 40 Q45 30 72 40 L74 120 Q45 132 16 120 Z" fill="${COL.sil}"/>
+<rect x="2" y="44" width="16" height="70" rx="8" fill="${COL.sil}"/><rect x="72" y="44" width="16" height="70" rx="8" fill="${COL.sil}"/>
+<rect x="24" y="128" width="18" height="118" rx="9" fill="${COL.sil}"/><rect x="48" y="128" width="18" height="118" rx="9" fill="${COL.sil}"/>
+<ellipse cx="16" cy="48" rx="9" ry="11" fill="${c(mm,'delt')}"/><ellipse cx="74" cy="48" rx="9" ry="11" fill="${c(mm,'delt')}"/>
+<ellipse cx="33" cy="56" rx="12" ry="9" fill="${c(mm,'pec')}"/><ellipse cx="57" cy="56" rx="12" ry="9" fill="${c(mm,'pec')}"/>
+<ellipse cx="10" cy="74" rx="6" ry="12" fill="${c(mm,'bic')}"/><ellipse cx="80" cy="74" rx="6" ry="12" fill="${c(mm,'bic')}"/>
+<rect x="36" y="70" width="18" height="42" rx="8" fill="${c(mm,'abs')}"/>
+<rect x="26" y="134" width="14" height="54" rx="7" fill="${c(mm,'quad')}"/><rect x="50" y="134" width="14" height="54" rx="7" fill="${c(mm,'quad')}"/></svg>`;}
+function back(mm,w=70){const h=w*250/90;return `<svg width="${w}" height="${h}" viewBox="0 0 90 250">
+<circle cx="45" cy="16" r="12" fill="${COL.sil}"/><path d="M18 40 Q45 30 72 40 L74 120 Q45 132 16 120 Z" fill="${COL.sil}"/>
+<rect x="2" y="44" width="16" height="70" rx="8" fill="${COL.sil}"/><rect x="72" y="44" width="16" height="70" rx="8" fill="${COL.sil}"/>
+<rect x="24" y="128" width="18" height="118" rx="9" fill="${COL.sil}"/><rect x="48" y="128" width="18" height="118" rx="9" fill="${COL.sil}"/>
+<path d="M33 34 L45 28 L57 34 L52 58 L38 58 Z" fill="${c(mm,'trap')}"/>
+<ellipse cx="16" cy="48" rx="9" ry="11" fill="${c(mm,'delt')}"/><ellipse cx="74" cy="48" rx="9" ry="11" fill="${c(mm,'delt')}"/>
+<ellipse cx="10" cy="76" rx="6" ry="13" fill="${c(mm,'tri')}"/><ellipse cx="80" cy="76" rx="6" ry="13" fill="${c(mm,'tri')}"/>
+<path d="M26 60 L38 62 L36 96 L24 88 Z" fill="${c(mm,'lat')}"/><path d="M64 60 L52 62 L54 96 L66 88 Z" fill="${c(mm,'lat')}"/>
+<ellipse cx="36" cy="124" rx="11" ry="12" fill="${c(mm,'glute')}"/><ellipse cx="54" cy="124" rx="11" ry="12" fill="${c(mm,'glute')}"/>
+<rect x="26" y="140" width="14" height="50" rx="7" fill="${c(mm,'ham')}"/><rect x="50" y="140" width="14" height="50" rx="7" fill="${c(mm,'ham')}"/></svg>`;}
+
+// ── Дані демо-вправ ─────────────────────────────────────────────────────────
+const EX=[
+ {id:'press',name:'Жим стоячи',group:'Груди / Плечі',level:'Середній',kb:true,
+  mm:{delt:1,tri:2,abs:3},muscles:'Основні: дельти · Допоміжні: трицепс',
+  anim:'press',phases:'Стійка → Жим → Локаут',
+  steps:[['Вихідне положення','Гиря на плечі, лікоть під гирею.'],['Виконання','Жми вертикально вгору до прямої руки.'],['Дихання','Видих на жимі.'],['Часті помилки','Прогин попереку, жим убік.']],
+  rec:{sets:4,reps:8}},
+ {id:'swing',name:'Махи гирею',group:'Ноги / Сідниці',level:'Новачок',kb:true,
+  mm:{glute:1,ham:1,lat:2,abs:3},muscles:'Основні: сідниці, біцепс стегна · Допоміжні: спина',
+  anim:'swing',phases:'Замах → Розгин тазу → Фіксація',
+  steps:[['Вихідне положення','Стопи ширше плечей, гиря попереду.'],['Виконання','Мах за рахунок тазу, не рук.'],['Дихання','Видих у верхній точці.'],['Часті помилки','Присідання замість нахилу.']],
+  rec:{sets:4,reps:15}},
+ {id:'pushup',name:'Віджимання',group:'Груди / Плечі',level:'Новачок',kb:false,
+  mm:{pec:1,tri:2,delt:2,abs:3},muscles:'Основні: груди · Допоміжні: трицепс, дельти',
+  anim:'pushup',phases:'Опускання → Низ → Віджим',
+  steps:[['Вихідне положення','Планка, долоні під плечима.'],['Виконання','Опускайся повільно, лікті 45°.'],['Дихання','Вдих униз, видих угору.'],['Часті помилки','Провисання попереку.']],
+  rec:{sets:4,reps:12}},
+ {id:'squat',name:'Присідання',group:'Ноги / Сідниці',level:'Новачок',kb:false,
+  mm:{quad:1,glute:1,ham:2,abs:3},muscles:'Основні: квадрицепси, сідниці · Допоміжні: біцепс стегна',
+  anim:'squat',phases:'Присід → Пауза → Підйом',
+  steps:[['Вихідне положення','Стопи на ширині плечей.'],['Виконання','Присідай до паралелі, спина пряма.'],['Дихання','Вдих униз, видих угору.'],['Часті помилки','Коліна всередину.']],
+  rec:{sets:4,reps:20}},
+];
+
+// ── Анімації техніки (SVG-петля силуету) ────────────────────────────────────
+function techSVG(kind){
+  // силует із анімованими сегментами, 2-с петля
+  const stick=(parts)=>`<svg width="150" height="220" viewBox="0 0 150 220">
+    <circle cx="75" cy="30" r="13" fill="none" stroke="#C6FF00" stroke-width="4"/>${parts}</svg>`;
+  if(kind==='press') return stick(`
+    <line x1="75" y1="43" x2="75" y2="120" stroke="#C6FF00" stroke-width="5"/>
+    <line x1="75" y1="120" x2="60" y2="185" stroke="#C6FF00" stroke-width="5"/>
+    <line x1="75" y1="120" x2="90" y2="185" stroke="#C6FF00" stroke-width="5"/>
+    <g><line x1="75" y1="60" x2="45" y2="70" stroke="#C6FF00" stroke-width="5">
+       <animate attributeName="y2" values="70;20;70" dur="2s" repeatCount="indefinite"/></line>
+       <line x1="75" y1="60" x2="105" y2="70" stroke="#C6FF00" stroke-width="5">
+       <animate attributeName="y2" values="70;20;70" dur="2s" repeatCount="indefinite"/></line>
+       <circle cx="45" cy="70" r="9" fill="#C6FF00"><animate attributeName="cy" values="70;20;70" dur="2s" repeatCount="indefinite"/></circle>
+       <circle cx="105" cy="70" r="9" fill="#C6FF00"><animate attributeName="cy" values="70;20;70" dur="2s" repeatCount="indefinite"/></circle></g>`);
+  if(kind==='squat') return `<svg width="150" height="220" viewBox="0 0 150 220">
+     <g><animateTransform attributeName="transform" type="translate" values="0,0; 0,40; 0,0" dur="2s" repeatCount="indefinite"/>
+     <circle cx="75" cy="30" r="13" fill="none" stroke="#C6FF00" stroke-width="4"/>
+     <line x1="75" y1="43" x2="75" y2="110" stroke="#C6FF00" stroke-width="5"/>
+     <line x1="75" y1="60" x2="45" y2="90" stroke="#C6FF00" stroke-width="5"/>
+     <line x1="75" y1="60" x2="105" y2="90" stroke="#C6FF00" stroke-width="5"/></g>
+     <line x1="75" y1="110" x2="55" y2="150" stroke="#4CD964" stroke-width="6">
+       <animate attributeName="y1" values="110;150;110" dur="2s" repeatCount="indefinite"/></line>
+     <line x1="55" y1="150" x2="55" y2="200" stroke="#C6FF00" stroke-width="5">
+       <animate attributeName="y1" values="150;180;150" dur="2s" repeatCount="indefinite"/></line>
+     <line x1="75" y1="110" x2="95" y2="150" stroke="#4CD964" stroke-width="6">
+       <animate attributeName="y1" values="110;150;110" dur="2s" repeatCount="indefinite"/></line>
+     <line x1="95" y1="150" x2="95" y2="200" stroke="#C6FF00" stroke-width="5">
+       <animate attributeName="y1" values="150;180;150" dur="2s" repeatCount="indefinite"/></line></svg>`;
+  if(kind==='pushup') return `<svg width="220" height="130" viewBox="0 0 220 130">
+     <circle cx="40" cy="55" r="12" fill="none" stroke="#C6FF00" stroke-width="4"/>
+     <line x1="52" y1="58" x2="175" y2="80" stroke="#C6FF00" stroke-width="6"/>
+     <line x1="175" y1="80" x2="200" y2="120" stroke="#C6FF00" stroke-width="5"/>
+     <g><animateTransform attributeName="transform" type="translate" values="0,0;0,26;0,0" dur="1.6s" repeatCount="indefinite"/>
+     <line x1="70" y1="60" x2="70" y2="120" stroke="#4CD964" stroke-width="6"/>
+     <line x1="120" y1="66" x2="120" y2="120" stroke="#C6FF00" stroke-width="5"/></g></svg>`;
+  // swing
+  return `<svg width="170" height="220" viewBox="0 0 170 220">
+     <circle cx="85" cy="30" r="13" fill="none" stroke="#C6FF00" stroke-width="4"/>
+     <line x1="85" y1="43" x2="85" y2="120" stroke="#C6FF00" stroke-width="5">
+       <animateTransform attributeName="transform" type="rotate" values="-18 85 120; 8 85 120; -18 85 120" dur="2s" repeatCount="indefinite"/></line>
+     <line x1="85" y1="120" x2="60" y2="200" stroke="#C6FF00" stroke-width="5"/>
+     <line x1="85" y1="120" x2="110" y2="200" stroke="#C6FF00" stroke-width="5"/>
+     <g><animateTransform attributeName="transform" type="rotate" values="60 85 60; -50 85 60; 60 85 60" dur="2s" repeatCount="indefinite"/>
+       <line x1="85" y1="60" x2="85" y2="140" stroke="#4CD964" stroke-width="5"/>
+       <circle cx="85" cy="150" r="12" fill="#C6FF00"/></g></svg>`;
+}
+
+// ── Стан і навігація ────────────────────────────────────────────────────────
+let cur=EX[0], weight=24, tickH=null;
+const $=id=>document.getElementById(id);
+
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>{
+    s.classList.remove('active','left');
+    if(s.id===id) s.classList.add('active');
+  });
+  const flow={'s-catalog':'КАТАЛОГ','s-detail':'КАРТКА ВПРАВИ','s-player':'ТРЕНУВАННЯ','s-done':'ЗАВЕРШЕННЯ'};
+  $('flowtag').textContent = flow[id]||'';
+}
+
+// Каталог → рендер списку
+function renderCatalog(){
+  $('ex-list').innerHTML = EX.map((e,i)=>`
+    <div class="card ex-row row" onclick="openDetail(${i})">
+      <div class="thumb">${front(e.mm,26)}</div>
+      <div class="grow"><div style="font-weight:700">${e.name}</div>
+        <div class="dim">${e.muscles.split('·')[0].replace('Основні:','').trim()}</div>
+        <div class="dim" style="margin-top:3px">${e.level}</div></div>
+      <span class="pill ${e.kb?'pill-kb':'pill-bw'}">${e.kb?'24 кг':'Своя вага'}</span>
+    </div>`).join('');
+}
+
+function openDetail(i){
+  cur=EX[i]; weight=24;
+  $('d-name').textContent=cur.name;
+  $('d-group').textContent=cur.group;
+  $('d-level').textContent=cur.level;
+  $('d-muscles').textContent=cur.muscles;
+  $('d-map').innerHTML=front(cur.mm,70)+back(cur.mm,70);
+  $('d-steps').innerHTML=cur.steps.map(s=>`<div class="step"><b>${s[0]}</b>${s[1]}</div>`).join('');
+  // перемикач ваги
+  const wr=$('d-weight'); wr.style.display=cur.kb?'flex':'none';
+  updateRec();
+  go('s-detail');
+}
+document.querySelectorAll('#d-weight button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#d-weight button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); weight=+b.dataset.w; updateRec();
+});
+function updateRec(){
+  const r=cur.rec; let reps=r.reps;
+  if(cur.kb){const f=Math.min(1.5,Math.max(.6,24/weight)); reps=Math.max(3,Math.round(r.reps*f));}
+  $('d-rec').textContent=`${r.sets} × ${reps}${cur.kb?' · '+weight+' кг':''}`;
+}
+
+// ▶ → анімація техніки
+function playTechnique(){
+  $('anim-name').textContent=cur.name;
+  $('anim-phase').textContent=cur.phases;
+  $('anim-stage').innerHTML=techSVG(cur.anim);
+  $('anim-overlay').classList.add('show');
+}
+function closeTechnique(){ $('anim-overlay').classList.remove('show'); }
+
+// ── Таймер (замкнутий цикл: prep→work→rest × підходи → done) ────────────────
+let queue=[], qi=0, remain=0, paused=false;
+function buildQueue(){
+  queue=[]; const sets=cur.rec.sets;
+  for(let s=0;s<sets;s++){
+    queue.push({kind:'work',sec:cur.kb?40:30});
+    if(s<sets-1) queue.push({kind:'rest',sec:20});
+  }
+}
+function startTimer(){
+  buildQueue(); qi=0; paused=false;
+  $('p-name').textContent=cur.name;
+  $('p-map').innerHTML=front(cur.mm,50);
+  enterPhase(); go('s-player'); runTick();
+}
+function enterPhase(){
+  const p=queue[qi]; remain=p.sec;
+  $('p-count').textContent=`${Math.floor(qi/2)+1} / ${cur.rec.sets}`;
+  $('p-phase').textContent = p.kind==='work'?'РОБОТА':'ВІДПОЧИНОК';
+  $('p-phase').style.background = p.kind==='work'?'rgba(198,255,0,.16)':'rgba(122,140,163,.2)';
+  $('p-phase').style.color = p.kind==='work'?'#C6FF00':'#7A8CA3';
+  $('p-timer').style.color = p.kind==='work'?'#C6FF00':'#7A8CA3';
+  const nx=queue[qi+1];
+  $('p-next').textContent = nx? (nx.kind==='work'?'Далі: робота':'Далі: відпочинок 20 с') : 'Останній підхід';
+  paint();
+}
+function paint(){
+  const m=String(Math.floor(remain/60)).padStart(2,'0'), s=String(remain%60).padStart(2,'0');
+  $('p-timer').textContent=`${m}:${s}`;
+  $('p-prog').style.width = (100*(queue[qi].sec-remain)/queue[qi].sec)+'%';
+}
+function runTick(){ clearInterval(tickH); tickH=setInterval(()=>{
+  if(paused) return;
+  remain--;
+  if(remain<0){ nextPhase(false); return; }
+  paint();
+},1000); }
+function nextPhase(manual){
+  qi++;
+  if(qi>=queue.length){ finish(); return; }
+  enterPhase();
+}
+function togglePause(){ paused=!paused; $('p-toggle').textContent = paused?'▶  Продовжити':'❚❚  Пауза'; }
+function stopTimer(){ clearInterval(tickH); }
+function finish(){
+  stopTimer();
+  const total=queue.reduce((a,b)=>a+b.sec,0);
+  $('done-time').textContent = String(Math.floor(total/60)).padStart(2,'0')+':'+String(total%60).padStart(2,'0');
+  go('s-done');
+  setTimeout(()=>$('done-toast').classList.add('show'),400);
+  setTimeout(()=>$('done-toast').classList.remove('show'),3200);
+}
+
+renderCatalog(); go('s-catalog');
+</script>
