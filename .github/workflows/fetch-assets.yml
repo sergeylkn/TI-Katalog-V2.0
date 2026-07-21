@@ -2,6 +2,12 @@ name: Fetch Stitch assets
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - claude/workout-app-react-native-gk9bla
+    paths:
+      - "assets-manifest.json"
+      - ".github/workflows/fetch-assets.yml"
 
 permissions:
   contents: write
