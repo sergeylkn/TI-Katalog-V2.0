@@ -9,6 +9,7 @@ on:
       - "App.js"
       - "package.json"
       - "app.json"
+      - "assets/**"
       - "android/**"
       - ".github/workflows/build-apk.yml"
 
