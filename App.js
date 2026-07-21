@@ -17,6 +17,7 @@ import {
   View,
   Text,
   TextInput,
+  Image,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -26,6 +27,7 @@ import {
 } from "react-native";
 import * as Speech from "expo-speech";
 import Svg, { Circle, Rect, Ellipse, Path } from "react-native-svg";
+import { EX_IMAGES } from "./assets/exercises";
 
 // ============================================================================
 // КОЛЬОРИ — «Volt Impact»
@@ -580,6 +582,7 @@ function CatalogScreen({ onOpen }) {
 // ============================================================================
 function DetailScreen({ ex, onBack, onStart }) {
   const [weight, setWeight] = useState(24);
+  const img = EX_IMAGES[ex.id];
   return (
     <ScrollView contentContainerStyle={styles.homeScroll}>
       <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -595,12 +598,15 @@ function DetailScreen({ ex, onBack, onStart }) {
         </View>
       </View>
 
-      {/* Блок техніки (місце під GIF/відео) */}
+      {/* Блок техніки — фото зі Stitch, якщо є, або плейсхолдер */}
       <View style={styles.media}>
-        <Text style={styles.mediaTag}>ТЕХНІКА · GIF</Text>
+        {img && img.tech && (
+          <Image source={img.tech} style={styles.mediaImg} resizeMode="cover" />
+        )}
         <View style={styles.playBtn}>
           <Text style={{ color: COLORS.onAccent, fontSize: 20, fontWeight: "900" }}>▶</Text>
         </View>
+        <Text style={styles.mediaCaption}>ТЕХНІКА · ПЕТЛЯ</Text>
       </View>
 
       {/* Перемикач ваги — лише для гирі */}
@@ -618,54 +624,50 @@ function DetailScreen({ ex, onBack, onStart }) {
         </View>
       )}
 
-      {/* Карта м'язів — перед + спина, як у макетах */}
+      {/* Карта м'язів — реальне зображення зі Stitch або SVG-фолбек */}
+      <Text style={styles.sectionLabel}>КАРТА М'ЯЗІВ</Text>
       <View style={styles.descCard}>
-        <Text style={styles.descTitle}>Працюючі м'язи</Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginTop: 6 }}>
-          <BodyFront mm={MM[ex.id] || {}} width={72} />
-          <BodyBack mm={MM[ex.id] || {}} width={72} />
-          <View style={{ flex: 1, gap: 8 }}>
-            <View style={styles.legendRow}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.accent }]} />
-              <Text style={styles.previewMeta}>Основні</Text>
-            </View>
-            <View style={styles.legendRow}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.accentSec }]} />
-              <Text style={styles.previewMeta}>Допоміжні</Text>
-            </View>
-            <View style={styles.legendRow}>
-              <View style={[styles.legendDot, { backgroundColor: "#31572e" }]} />
-              <Text style={styles.previewMeta}>Стабілізатори</Text>
-            </View>
+        {img && img.anatomy ? (
+          <Image source={img.anatomy} style={styles.anatomyImg} resizeMode="contain" />
+        ) : (
+          <View style={{ flexDirection: "row", justifyContent: "center", gap: 18 }}>
+            <BodyFront mm={MM[ex.id] || {}} width={78} />
+            <BodyBack mm={MM[ex.id] || {}} width={78} />
+          </View>
+        )}
+        <View style={styles.legendBar}>
+          <View style={styles.legendRow}>
+            <View style={[styles.legendDot, { backgroundColor: COLORS.accent }]} />
+            <Text style={styles.previewMeta}>Основні</Text>
+          </View>
+          <View style={styles.legendRow}>
+            <View style={[styles.legendDot, { backgroundColor: COLORS.accentSec }]} />
+            <Text style={styles.previewMeta}>Допоміжні</Text>
+          </View>
+          <View style={styles.legendRow}>
+            <View style={[styles.legendDot, { backgroundColor: "#31572e" }]} />
+            <Text style={styles.previewMeta}>Стабілізатори</Text>
           </View>
         </View>
-        <Text style={[styles.descText, { marginTop: 10 }]}>
-          <Text style={{ color: COLORS.accent }}>Основні:</Text> {ex.muscles.p}{"\n"}
-          <Text style={{ color: COLORS.accentSec }}>Допоміжні:</Text> {ex.muscles.s}{"\n"}
-          <Text style={{ color: COLORS.textDim }}>Стабілізатори:</Text> {ex.muscles.st}
+        <Text style={[styles.descText, { marginTop: 8, fontSize: 13 }]}>
+          <Text style={{ color: COLORS.accent }}>Основні:</Text> {ex.muscles.p}  ·  {" "}
+          <Text style={{ color: COLORS.accentSec }}>Допоміжні:</Text> {ex.muscles.s}
         </Text>
       </View>
 
-      {/* Техніка */}
-      <View style={styles.descCard}>
-        <Text style={styles.descTitle}>Техніка</Text>
-        {[
-          ["Вихідне положення", ex.tech.start],
-          ["Виконання", ex.tech.exec],
-          ["Дихання", ex.tech.breath],
-          ["Часті помилки", ex.tech.mistakes],
-        ].map(([t, d], i) => (
-          <View key={i} style={{ flexDirection: "row", marginTop: i ? 10 : 4 }}>
-            <View style={styles.stepNum}>
-              <Text style={styles.stepNumText}>{i + 1}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.stepTitle}>{t}</Text>
-              <Text style={styles.descText}>{d}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
+      {/* Техніка — кожен крок окремою карткою, як у макеті */}
+      <Text style={styles.sectionLabel}>ТЕХНІКА</Text>
+      {[
+        ["Вихідне положення", ex.tech.start],
+        ["Виконання", ex.tech.exec],
+        ["Дихання", ex.tech.breath],
+        ["Часті помилки", ex.tech.mistakes],
+      ].map(([t, d], i) => (
+        <View key={i} style={styles.stepCard}>
+          <Text style={styles.stepTitle}>{t}</Text>
+          <Text style={styles.descText}>{d}</Text>
+        </View>
+      ))}
 
       {/* Рекомендація */}
       <View style={[styles.descCard, { flexDirection: "row", alignItems: "center" }]}>
@@ -883,20 +885,37 @@ const styles = StyleSheet.create({
   },
   pillBwText: { color: COLORS.accentSec, fontSize: 11, fontWeight: "800" },
   media: {
-    height: 160, borderRadius: 20, backgroundColor: COLORS.cardAlt,
+    height: 200, borderRadius: 20, backgroundColor: COLORS.cardAlt,
     borderWidth: 1, borderColor: COLORS.border, marginBottom: 16,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center", justifyContent: "center", overflow: "hidden",
   },
-  mediaTag: {
-    position: "absolute", left: 14, top: 12, color: COLORS.textDim,
-    fontSize: 10, fontWeight: "800", letterSpacing: 1.2,
+  mediaImg: { ...StyleSheet.absoluteFillObject, width: "100%", height: "100%" },
+  mediaCaption: {
+    position: "absolute", bottom: 12, color: COLORS.text,
+    fontSize: 11, fontWeight: "800", letterSpacing: 1.4,
+    textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 4,
   },
   playBtn: {
     width: 54, height: 54, borderRadius: 27, backgroundColor: COLORS.accent,
     alignItems: "center", justifyContent: "center",
   },
+  sectionLabel: {
+    color: COLORS.text, fontSize: 14, fontWeight: "800",
+    letterSpacing: 1.5, marginTop: 6, marginBottom: 10,
+  },
+  anatomyImg: {
+    width: "100%", height: 240, borderRadius: 12, backgroundColor: "#000",
+  },
+  legendBar: {
+    flexDirection: "row", justifyContent: "space-between",
+    marginTop: 12, flexWrap: "wrap", gap: 8,
+  },
   legendRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   legendDot: { width: 11, height: 11, borderRadius: 3 },
+  stepCard: {
+    backgroundColor: COLORS.card, borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: 10,
+  },
 
   seg: {
     flexDirection: "row", backgroundColor: COLORS.cardAlt,
