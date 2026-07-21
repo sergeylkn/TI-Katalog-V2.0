@@ -1,0 +1,58 @@
+name: Fetch Stitch assets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download exercise images from manifest
+        run: |
+          mkdir -p assets/exercises
+          node - <<'EOF'
+          const fs = require('fs');
+          const https = require('https');
+          const manifest = JSON.parse(fs.readFileSync('assets-manifest.json', 'utf8'));
+          function dl(url, dest) {
+            return new Promise((resolve) => {
+              const get = (u, redirects) => https.get(u, (res) => {
+                if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects < 5) {
+                  return get(res.headers.location, redirects + 1);
+                }
+                if (res.statusCode !== 200) { console.log('SKIP', dest, res.statusCode); return resolve(false); }
+                const out = fs.createWriteStream(dest);
+                res.pipe(out);
+                out.on('finish', () => { out.close(); console.log('OK  ', dest); resolve(true); });
+              }).on('error', (e) => { console.log('ERR ', dest, e.message); resolve(false); });
+              get(url, 0);
+            });
+          }
+          (async () => {
+            for (const [slug, urls] of Object.entries(manifest)) {
+              if (urls.tech) await dl(urls.tech, `assets/exercises/${slug}-tech.png`);
+              if (urls.anatomy) await dl(urls.anatomy, `assets/exercises/${slug}-anatomy.png`);
+            }
+          })();
+          EOF
+          ls -la assets/exercises/ | head -8
+          echo "всего файлов: $(ls assets/exercises/ | wc -l)"
+
+      - name: Commit assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add assets/exercises
+          if git diff --cached --quiet; then
+            echo "nothing to commit"
+          else
+            git commit -m "Add Stitch-generated exercise images (technique photos + anatomy maps)"
+            git push
+          fi
