@@ -43,7 +43,7 @@ Claude Code. Ниже — как распространить его на ост
 Settings → Capabilities → Skills → загрузить ZIP с папкой, внутри
 которой лежит `SKILL.md`. Собрать архив:
 
-    cd .claude/skills && zip -r critical-skill.zip critical
+    cd .claude/skills && zip -r critical-skill.zip critical -x "critical/GLOBAL.md" "critical/install.sh"
 
 Учтите разницу: скилл подгружается по ситуации, когда модель сочтёт его
 уместным, а поле предпочтений действует всегда. Для правила о поведении
@@ -57,3 +57,10 @@ Settings → Capabilities → Skills → загрузить ZIP с папкой,
 И добавить в `~/.claude/CLAUDE.md` (создать, если файла нет) тот же
 блок, что лежит в `CLAUDE.md` этого репозитория, в разделе «Ответы на
 оценочные вопросы».
+
+Вместо ручного копирования из раздела 3 можно запустить на своей машине:
+
+    bash .claude/skills/critical/install.sh
+
+Скрипт кладёт `SKILL.md` в `~/.claude/skills/critical/` и добавляет
+правило в `~/.claude/CLAUDE.md`. Повторный запуск ничего не дублирует.
